@@ -45,10 +45,10 @@ export async function runQuery(
     return {
       records: result.records.map((record) => ({
         keys: record.keys,
-        values: record.values().map((v) => v.toString()),
+        values: [...record.values()].map(String),
       })),
       summary: {
-        counters: result.summary.counters._stats,
+        counters: result.summary.counters.containsUpdates,
       },
     };
   } finally {

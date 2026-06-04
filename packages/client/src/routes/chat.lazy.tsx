@@ -1,12 +1,7 @@
-import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAskAI } from "../lib/ai";
 
-export const Route = createLazyFileRoute("/chat")({
-  component: ChatPage,
-});
-
-function ChatPage() {
+export function ChatPage() {
   const [prompt, setPrompt] = useState("");
   const [useGraph, setUseGraph] = useState(false);
   const ask = useAskAI();
@@ -60,7 +55,7 @@ function ChatPage() {
       {ask.isSuccess && (
         <div className="bg-gray-900 border border-gray-800 rounded p-4">
           <div className="text-xs text-gray-500 mb-2">AI Response:</div>
-          <div className="text-sm whitespace-pre-wrap">{ask.data.data?.answer}</div>
+          <div className="text-sm whitespace-pre-wrap">{ask.data?.answer}</div>
         </div>
       )}
     </div>

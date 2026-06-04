@@ -4,22 +4,31 @@ import { apiPost, apiGet, queryClient } from "./api";
 export function useGraphHealth() {
   return useQuery({
     queryKey: ["graph", "health"],
-    queryFn: () => apiGet<{ connected: boolean }>("/api/graph/health"),
+    queryFn: async () => {
+      const res = await apiGet<{ connected: boolean }>("/api/graph/health");
+      if (!res.ok) throw new Error(res.error.message);
+      return res.data;
+    },
   });
 }
 
 export function useGraphQuery() {
   return useMutation({
-    mutationFn: (cypher: string) =>
-      apiPost<{ records: unknown[]; summary: unknown }>("/api/graph/query", {
-        cypher,
-      }),
+    mutationFn: async (cypher: string) => {
+      const res = await apiPost<{ records: unknown[]; summary: unknown }>("/api/graph/query", { cypher });
+      if (!res.ok) throw new Error(res.error.message);
+      return res.data;
+    },
   });
 }
 
 export function useGraphSeed() {
   return useMutation({
-    mutationFn: () => apiPost<{ message: string; nodesSeeded: number }>("/api/graph/seed", {}),
+    mutationFn: async () => {
+      const res = await apiPost<{ message: string; nodesSeeded: number }>("/api/graph/seed", {});
+      if (!res.ok) throw new Error(res.error.message);
+      return res.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["graph"] });
     },

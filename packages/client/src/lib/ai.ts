@@ -3,7 +3,10 @@ import { apiPost } from "./api";
 
 export function useAskAI() {
   return useMutation({
-    mutationFn: (params: { prompt: string; useGraphContext?: boolean }) =>
-      apiPost<{ answer: string }>("/api/ai/ask", params),
+    mutationFn: async (params: { prompt: string; useGraphContext?: boolean }) => {
+      const res = await apiPost<{ answer: string }>("/api/ai/ask", params);
+      if (!res.ok) throw new Error(res.error.message);
+      return res.data;
+    },
   });
 }

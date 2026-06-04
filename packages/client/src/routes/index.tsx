@@ -1,11 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useGraphHealth } from "../lib/graph";
 
-export const Route = createFileRoute("/")({
-  component: HomePage,
-});
-
-function HomePage() {
+export function HomePage() {
   const { data: health } = useGraphHealth();
 
   return (
@@ -26,12 +21,12 @@ function HomePage() {
           <p className="text-gray-400 text-sm mb-3">
             Query your Neo4j database with Cypher, see results in real time.
           </p>
-          <span
-            className={`inline-block w-2 h-2 rounded-full mr-2 ${health?.data?.connected ? "bg-green-400" : "bg-red-400"}`}
-          />
-          <span className="text-xs text-gray-500">
-            Neo4j {health?.data?.connected ? "Connected" : "Disconnected"}
-          </span>
+    <span
+      className={`inline-block w-2 h-2 rounded-full mr-2 ${health?.connected ? "bg-green-400" : "bg-red-400"}`}
+    />
+    <span className="text-xs text-gray-500">
+      Neo4j {health?.connected ? "Connected" : "Disconnected"}
+    </span>
         </div>
 
         <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">

@@ -1,12 +1,7 @@
-import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useGraphQuery, useGraphSeed } from "../lib/graph";
 
-export const Route = createLazyFileRoute("/graph")({
-  component: GraphPage,
-});
-
-function GraphPage() {
+export function GraphPage() {
   const [cypher, setCypher] = useState("MATCH (n) RETURN n LIMIT 25");
   const query = useGraphQuery();
   const seed = useGraphSeed();
@@ -47,13 +42,13 @@ function GraphPage() {
 
       {query.isSuccess && (
         <pre className="bg-gray-900 border border-gray-800 rounded p-4 text-xs overflow-auto max-h-96">
-          {JSON.stringify(query.data.data, null, 2)}
+          {JSON.stringify(query.data, null, 2)}
         </pre>
       )}
 
       {seed.isSuccess && (
         <div className="bg-green-900/50 border border-green-800 rounded p-3 text-sm">
-          {seed.data.data?.message} ({seed.data.data?.nodesSeeded} relationships created)
+          {seed.data?.message} ({seed.data?.nodesSeeded} relationships created)
         </div>
       )}
     </div>

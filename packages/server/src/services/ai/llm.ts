@@ -1,8 +1,5 @@
 import { streamText, generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import pino from "pino";
-
-const logger = pino({ name: "ai-service" });
 
 export interface AIConfig {
   apiKey: string;
