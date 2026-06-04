@@ -1,0 +1,19 @@
+{
+  "name": "gi-hack",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n client,server -c cyan,green \"npm -w packages/client run dev\" \"npm -w packages/server run dev\"",
+    "dev:client": "npm -w packages/client run dev",
+    "dev:server": "npm -w packages/server run dev",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "lint": "npm run lint --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3"
+  }
+}
