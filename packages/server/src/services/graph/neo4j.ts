@@ -1,0 +1,64 @@
+import neo4j, { Driver, Session } from "neo4j-driver";
+import pino from "pino";
+
+const logger = pino({ name: "neo4j-service" });
+
+let driver: Driver | null = null;
+
+export interface Neo4jConfig {
+  uri: string;
+  user: string;
+  password: string;
+}
+
+export function createDriver(config: Neo4jConfig): Driver {
+  if (driver) return driver;
+
+  driver = neo4j.driver(config.uri, neo4j.auth.basic(config.user, config.password), {
+    maxConnectionLifetime: 3 * 60 * 60 * 1000,
+    maxConnectionPoolSize: 10,
+  });
+
+  return driver;
+}
+
+export async function verifyConnection(): Promise<boolean> {
+  if (!driver) return false;
+  try {
+    await driver.getServerInfo();
+    return true;
+  } catch (err) {
+    logger.error(err, "Neo4j connection failed");
+    return false;
+  }
+}
+
+export async function runQuery(
+  cypher: string,
+  params: Record<string, unknown> = {}
+) {
+  if (!driver) throw new Error("Neo4j driver not initialized");
+
+  const session: Session = driver.session();
+  try {
+    const result = await session.run(cypher, params);
+    return {
+      records: result.records.map((record) => ({
+        keys: record.keys,
+        values: record.values().map((v) => v.toString()),
+      })),
+      summary: {
+        counters: result.summary.counters._stats,
+      },
+    };
+  } finally {
+    await session.close();
+  }
+}
+
+export async function closeDriver(): Promise<void> {
+  if (driver) {
+    await driver.close();
+    driver = null;
+  }
+}
