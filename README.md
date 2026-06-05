@@ -270,93 +270,110 @@ See the full spec at [`docs/superpowers/specs/2026-06-05-leadgraph-ingestion-des
 ## Implementation Plan (23 Tasks, 5 Phases)
 
 > Full code for each task in [`docs/superpowers/plans/2026-06-05-leadgraph-comprehensive-plan.md`](docs/superpowers/plans/2026-06-05-leadgraph-comprehensive-plan.md)
+>
+> **Team Legend:**
+> | Icon | Member | Role |
+> |------|--------|------|
+> | 🛠️ | **You** | Backend Ingestion Pipeline |
+> | 🎨 | **Collab A** | Lead Dashboard UI |
+> | 📋 | **Collab B** | Pipeline CRM |
+> | 🤖 | **Collab C** | AI Outreach & Scoring |
+> | ✅ | Anyone | Verification |
 
-### Phase 1: Backend Ingestion + Scoring
+### Phase 1: Backend Ingestion + Scoring (🛠️ You)
 
-| # | Check | Task | Files |
-|---|-------|------|-------|
-| 1 | `[ ]` | **queryRows helper** — add native-record Cypher helper to `neo4j.ts` for scorer | `services/graph/neo4j.ts` |
-| 2 | `[ ]` | **Types** — SourceAdapter interface, SourceConfig, scoring types (TierLevel, ScoreBreakdown, ScoredCompany) | `services/graph/ingest/types.ts` |
-| 3 | `[ ]` | **Ontology seed** — constraints, 7 applications, 10 Siemens products, 15 competitor companies, seed signals | `services/graph/ingest/ontology.ts` |
-| 4 | `[ ]` | **5 stub adapters** — ClinicalTrials, Patent, Hiring, Conference, Funding (hardcoded records → LeadCandidate) | `services/graph/ingest/adapters/*-stub.ts` |
-| 5 | `[ ]` | **FDA adapter** — real `api.fda.gov/device/510k` with 8 product code filters, company extraction | `services/graph/ingest/adapters/fda-510k.ts` |
-| 6 | `[ ]` | **GitHub adapter** — real `api.github.com` keyword search, org detection, topic→application mapping | `services/graph/ingest/adapters/github.ts` |
-| 7 | `[ ]` | **SourceManager** — concurrent runner, pool=3, weight-sorted, dedup, Neo4j upsert | `services/graph/ingest/orchestrator.ts` |
-| 8 | `[ ]` | **Index + routes** — singleton SourceManager with all 7 adapters, POST /ingest, GET /sources | `ingest/index.ts`, `routes/graph.ts` |
-| 9 | `[ ]` | **CLI + Scoring** — `npm run ingest`, `npm run score`. Scorer computes signal (0-40) + product fit (0-30) + segment bonus (0-20) + recency (0-10) → HOT/WARM/COLD | `scripts/ingest.ts`, `scoring/scorer.ts` |
+| # | Check | Task | Owner | Files |
+|---|-------|------|-------|-------|
+| 1 | `[ ]` | **queryRows helper** — add native-record Cypher helper to `neo4j.ts` for scorer | 🛠️ You | `services/graph/neo4j.ts` |
+| 2 | `[ ]` | **Types** — SourceAdapter interface, SourceConfig, scoring types (TierLevel, ScoreBreakdown, ScoredCompany) | 🛠️ You | `services/graph/ingest/types.ts` |
+| 3 | `[ ]` | **Ontology seed** — constraints, 7 applications, 10 Siemens products, 15 competitor companies, seed signals | 🛠️ You | `services/graph/ingest/ontology.ts` |
+| 4 | `[ ]` | **5 stub adapters** — ClinicalTrials, Patent, Hiring, Conference, Funding (hardcoded records → LeadCandidate) | 🛠️ You | `services/graph/ingest/adapters/*-stub.ts` |
+| 5 | `[ ]` | **FDA adapter** — real `api.fda.gov/device/510k` with 8 product code filters, company extraction | 🛠️ You | `services/graph/ingest/adapters/fda-510k.ts` |
+| 6 | `[ ]` | **GitHub adapter** — real `api.github.com` keyword search, org detection, topic→application mapping | 🛠️ You | `services/graph/ingest/adapters/github.ts` |
+| 7 | `[ ]` | **SourceManager** — concurrent runner, pool=3, weight-sorted, dedup, Neo4j upsert | 🛠️ You | `services/graph/ingest/orchestrator.ts` |
+| 8 | `[ ]` | **Index + routes** — singleton SourceManager with all 7 adapters, POST /ingest, GET /sources | 🛠️ You | `ingest/index.ts`, `routes/graph.ts` |
+| 9 | `[ ]` | **CLI + Scoring** — `npm run ingest`, `npm run score`. Scorer computes signal (0-40) + product fit (0-30) + segment bonus (0-20) + recency (0-10) → HOT/WARM/COLD | 🛠️ You | `scripts/ingest.ts`, `scoring/scorer.ts` |
 
 > **Depends on:** Nothing. **Delivers:** Neo4j populated with companies, signals, scores.
 
-### Phase 2: Dashboard UI (React)
+### Phase 2: Dashboard UI (🎨 Collab A)
 
-| # | Check | Task | Files |
-|---|-------|------|-------|
-| 10 | `[ ]` | **API hooks** — useIngest, useSeed, useScores, useSources in TanStack Query | `client/src/lib/graph.ts` |
-| 11 | `[ ]` | **Navigation** — add Leads, Pipeline, Admin links to RootLayout | `client/src/routes/__root.tsx` |
-| 12 | `[ ]` | **Dashboard home** — 4 summary cards, Top 5 leads, Quick Actions (Seed/Ingest buttons) | `client/src/routes/index.tsx` |
-| 13 | `[ ]` | **Lead Explorer** — score-sorted table with tier badges + score bars, search/filter, detail drawer with signals timeline + breakdown + outreach hook | `client/src/routes/leads*.tsx` |
-| 14 | `[ ]` | **Admin panel** — per-source Run buttons, health status, scoring summary, Neo4j stats | `client/src/routes/admin.tsx` |
+| # | Check | Task | Owner | Files |
+|---|-------|------|-------|-------|
+| 10 | `[ ]` | **API hooks** — useIngest, useSeed, useScores, useSources in TanStack Query | 🎨 A | `client/src/lib/graph.ts` |
+| 11 | `[ ]` | **Navigation** — add Leads, Pipeline, Admin links to RootLayout | 🎨 A | `client/src/routes/__root.tsx` |
+| 12 | `[ ]` | **Dashboard home** — 4 summary cards, Top 5 leads, Quick Actions (Seed/Ingest buttons) | 🎨 A | `client/src/routes/index.tsx` |
+| 13 | `[ ]` | **Lead Explorer** — score-sorted table with tier badges + score bars, search/filter, detail drawer with signals timeline + breakdown + outreach hook | 🎨 A | `client/src/routes/leads*.tsx` |
+| 14 | `[ ]` | **Admin panel** — per-source Run buttons, health status, scoring summary, Neo4j stats | 🎨 A | `client/src/routes/admin.tsx` |
 
-> **Depends on:** Phase 1 (for data), but buildable with mock data. **Delivers:** Full UI to browse/explore/scored leads.
+> **Depends on:** Phase 1 (for data), but buildable with mock data. **Delivers:** Full UI to browse/explore scored leads.
 
-### Phase 3: Pipeline CRM
+### Phase 3: Pipeline CRM (📋 Collab B)
 
-| # | Check | Task | Files |
-|---|-------|------|-------|
-| 15 | `[ ]` | **Pipeline data model + API** — Contact/PipelineStage/Activity Cypher, POST start, PUT advance, GET leads, POST notes | `services/graph/pipeline/`, `routes/pipeline.ts` |
-| 16 | `[ ]` | **Pipeline React Query hooks** — usePipelineLeads, useAdvanceStage, useAddNote, useActivity | `client/src/lib/pipeline.ts` |
-| 17 | `[ ]` | **Pipeline kanban** — 5-column (New→Contacted→Meeting→Proposal→Closed), drag between stages, add note modal | `client/src/routes/pipeline.tsx` |
+| # | Check | Task | Owner | Files |
+|---|-------|------|-------|-------|
+| 15 | `[ ]` | **Pipeline data model + API** — Contact/PipelineStage/Activity Cypher, POST start, PUT advance, GET leads, POST notes | 📋 B | `services/graph/pipeline/`, `routes/pipeline.ts` |
+| 16 | `[ ]` | **Pipeline React Query hooks** — usePipelineLeads, useAdvanceStage, useAddNote, useActivity | 📋 B | `client/src/lib/pipeline.ts` |
+| 17 | `[ ]` | **Pipeline kanban** — 5-column (New→Contacted→Meeting→Proposal→Closed), drag between stages, add note modal | 📋 B | `client/src/routes/pipeline.tsx` |
 
 > **Depends on:** Phase 1 (for companies). **Delivers:** Sales pipeline with stage tracking + activity log.
 
-### Phase 4: AI Layer
+### Phase 4: AI Layer (🤖 Collab C)
 
-| # | Check | Task | Files |
-|---|-------|------|-------|
-| 18 | `[ ]` | **AI enrichment** — LLM fills segment/domain/applications for companies | `services/ai/enrich.ts` |
-| 19 | `[ ]` | **AI outreach** — LLM generates personalized cold email from signals + products | `services/ai/outreach.ts` |
-| 20 | `[ ]` | **AI explainer + API** — LLM explains score breakdown, POST /enrich/:id, POST /outreach/:id, GET /explain/:id | `services/ai/explain.ts`, `routes/ai.ts` |
-| 21 | `[ ]` | **AI UI** — "Enrich" / "Generate Email" / "Why this score?" buttons on lead detail drawer | `client/src/routes/leads/$id.tsx` |
+| # | Check | Task | Owner | Files |
+|---|-------|------|-------|-------|
+| 18 | `[ ]` | **AI enrichment** — LLM fills segment/domain/applications for companies | 🤖 C | `services/ai/enrich.ts` |
+| 19 | `[ ]` | **AI outreach** — LLM generates personalized cold email from signals + products | 🤖 C | `services/ai/outreach.ts` |
+| 20 | `[ ]` | **AI explainer + API** — LLM explains score breakdown, POST /enrich/:id, POST /outreach/:id, GET /explain/:id | 🤖 C | `services/ai/explain.ts`, `routes/ai.ts` |
+| 21 | `[ ]` | **AI UI** — "Enrich" / "Generate Email" / "Why this score?" buttons on lead detail drawer | 🤖 C | `client/src/routes/leads/$id.tsx` |
 
 > **Depends on:** Phase 1 + Phase 2 (for data + detail drawer). **Delivers:** AI-powered enrichment, outreach emails, score explanations.
 
-### Phase 5: Verification
+### Phase 5: Verification (✅ All)
 
-| # | Check | Task | Details |
-|---|-------|------|---------|
-| 22 | `[ ]` | **TypeScript + LSP** — `npm run typecheck` clean, no `lsp_diagnostics` errors on all new files | All changed files |
-| 23 | `[ ]` | **Neo4j smoke test** — `docker compose up -d neo4j` → `npm run ingest:seed` → `npm run ingest` → `npm run score` → check API endpoints | Full pipeline |
+| # | Check | Task | Owner | Details |
+|---|-------|------|-------|---------|
+| 22 | `[ ]` | **TypeScript + LSP** — `npm run typecheck` clean, no `lsp_diagnostics` errors on all new files | ✅ Anyone | All changed files |
+| 23 | `[ ]` | **Neo4j smoke test** — `docker compose up -d neo4j` → `npm run ingest:seed` → `npm run ingest` → `npm run score` → check API endpoints | ✅ Anyone | Full pipeline |
 
 ---
+
+## Team Member Overview
+
+| Member | Focus | Tasks | What They Build |
+|--------|-------|-------|-----------------|
+| 🛠️ **You** | Ingestion Pipeline | 1–9 | Types, ontology, 7 data source adapters (FDA + GitHub + 5 stubs), concurrent SourceManager, Neo4j upsert, scoring pipeline, CLI scripts |
+| 🎨 **Collab A** | Lead Dashboard UI | 10–14 | React pages: Dashboard home with summary cards, Lead Explorer table with filters + detail drawer, Admin panel with ingest controls. Uses TanStack Router/Query |
+| 📋 **Collab B** | Pipeline CRM | 15–17 | Neo4j pipeline data model (Contact/Stage/Activity), CRUD API, React kanban board with drag-and-drop, activity timeline, note-taking |
+| 🤖 **Collab C** | AI Layer | 18–21 | Company enrichment (LLM fills missing data), personalized outreach email generator, score explainer, UI integration with buttons on lead detail drawer |
 
 ## Dependency Flow
 
 ```
-                     ┌─────────────────────────────────────┐
-                     │  You: Ingestion Pipeline             │
-                     │  Task 1-9: types → adapters →        │
-                     │  SourceManager → seed → ingest →     │
-                     │  score                                │
-                     │                                       │
-                     │  OUTPUT: Neo4j full of companies,     │
-                     │  signals, scores, tiers               │
-                     └─────────────────┬───────────────────┘
-                                       │
-                       ┌───────────────┼───────────────┐
-                       ▼               ▼               ▼
-              ┌────────────────┐ ┌────────────┐ ┌──────────────┐
-              │ Collab A       │ │ Collab B   │ │ Collab C     │
-              │ Lead Dashboard │ │ Pipeline   │ │ AI Layer     │
-              │                │ │ CRM        │ │              │
-              │ Reads from     │ │ Reads AND  │ │ Reads AND    │
-              │ Neo4j via API  │ │ writes to  │ │ writes to    │
-              │ (read-only)    │ │ Neo4j      │ │ Neo4j        │
-              │                │ │            │ │              │
-              │ Tasks A1-A5    │ │ Tasks B1-B5│ │ Tasks C1-C5  │
-              └────────────────┘ └────────────┘ └──────────────┘
+                          ┌─────────────────────────────────────┐
+                          │ 🛠️ You: Ingestion Pipeline          │
+                          │ Task 1-9: types → adapters →         │
+                          │ SourceManager → seed → ingest →      │
+                          │ score                                │
+                          │                                      │
+                          │ OUTPUT: Neo4j full of companies,      │
+                          │ signals, scores, tiers               │
+                          └─────────────────┬───────────────────┘
+                                            │
+                            ┌───────────────┼───────────────┐
+                            ▼               ▼               ▼
+                   ┌────────────────┐ ┌────────────┐ ┌──────────────┐
+                   │ 🎨 Collab A    │ │ 📋 Collab B│ │ 🤖 Collab C  │
+                   │ Lead Dashboard │ │ Pipeline   │ │ AI Layer     │
+                   │                │ │ CRM        │ │              │
+                   │ Tasks 10-14    │ │ Tasks 15-17│ │ Tasks 18-21  │
+                   │ Reads from     │ │ Reads AND  │ │ Reads AND    │
+                   │ Neo4j via API  │ │ writes to  │ │ writes to    │
+                   │ (read-only)    │ │ Neo4j      │ │ Neo4j        │
+                   └────────────────┘ └────────────┘ └──────────────┘
 ```
 
-**Parallel execution:** All 3 collaborators can start as soon as the graph schema is known (YOU Task 2). Collaborator A needs scoring data (YOU Task 9) for full functionality but can build the UI with mock data first. Collaborators B and C are fully independent.
+**Parallel execution:** All 3 collaborators can start as soon as the graph schema is known (🛠️ You Task 2). 🎨 Collab A needs scoring data (Task 9) for full functionality but can build UI with mock data first. 📋 Collab B and 🤖 Collab C are fully independent once the company data exists in Neo4j.
 
 ---
 
