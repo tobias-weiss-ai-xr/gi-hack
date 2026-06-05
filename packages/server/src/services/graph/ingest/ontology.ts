@@ -1,5 +1,6 @@
 import { runQuery } from "../neo4j.js";
 import { SeedSummary } from "./types.js";
+import { normalizeCompanyName } from "./orchestrator.js";
 
 const APPLICATION_AREAS = [
   "Hemostasis & Thrombosis",
@@ -223,16 +224,17 @@ export async function seedGraph(): Promise<SeedSummary> {
   let relationshipsCreated = 0;
 
   // Create constraints (idempotent — IF NOT EXISTS)
-  await runQuery("CREATE CONSTRAINT IF NOT EXISTS FOR (c:Company) REQUIRE c.name IS UNIQUE");
+  // normalizedName is the unique key, matching orchestrator.ts cross-source dedup
+  await runQuery("CREATE CONSTRAINT IF NOT EXISTS FOR (c:Company) REQUIRE c.normalizedName IS UNIQUE");
   await runQuery("CREATE CONSTRAINT IF NOT EXISTS FOR (a:Application) REQUIRE a.name IS UNIQUE");
   await runQuery("CREATE INDEX IF NOT EXISTS FOR (s:Signal) ON (s.type)");
   constraintsCreated = 3;
 
   // Create Siemens as a baseline company
   await runQuery(
-    `MERGE (c:Company {name: $name})
-     SET c.domain = $domain, c.description = $description, c.segment = $segment, c.region = $region`,
-    { name: "Siemens Healthineers", domain: "siemens-healthineers.com", description: "Global medical technology company — Marburg site produces biological intermediates for diagnostics", segment: "IVD_MANUFACTURER", region: "EUROPE" }
+    `MERGE (c:Company {normalizedName: $normName})
+     SET c.name = $name, c.domain = $domain, c.description = $description, c.segment = $segment, c.region = $region`,
+    { normName: normalizeCompanyName("Siemens Healthineers"), name: "Siemens Healthineers", domain: "siemens-healthineers.com", description: "Global medical technology company — Marburg site produces biological intermediates for diagnostics", segment: "IVD_MANUFACTURER", region: "EUROPE" }
   );
   companiesSeeded++;
 
@@ -257,9 +259,9 @@ export async function seedGraph(): Promise<SeedSummary> {
 
     // Link product to Siemens
     await runQuery(
-      `MATCH (c:Company {name: "Siemens Healthineers"}), (p:Product {catalogId: $catalogId})
+      `MATCH (c:Company {normalizedName: $normName}), (p:Product {catalogId: $catalogId})
        MERGE (c)-[:SUPPLIES]->(p)`,
-      { catalogId: `SH-${product.name.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}` }
+      { normName: normalizeCompanyName("Siemens Healthineers"), catalogId: `SH-${product.name.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}` }
     );
     relationshipsCreated++;
 
@@ -277,18 +279,18 @@ export async function seedGraph(): Promise<SeedSummary> {
   // Create competitor companies with signals
   for (const company of COMPANIES) {
     await runQuery(
-      `MERGE (c:Company {name: $name})
-       SET c.domain = $domain, c.description = $description, c.segment = $segment, c.region = $region`,
-      { name: company.name, domain: company.domain, description: company.description, segment: company.segment, region: company.region }
+      `MERGE (c:Company {normalizedName: $normName})
+       SET c.name = $name, c.domain = $domain, c.description = $description, c.segment = $segment, c.region = $region`,
+      { normName: normalizeCompanyName(company.name), name: company.name, domain: company.domain, description: company.description, segment: company.segment, region: company.region }
     );
     companiesSeeded++;
 
     // Link to application areas
     for (const app of company.applications) {
       await runQuery(
-        `MATCH (c:Company {name: $name}), (a:Application {name: $app})
-         MERGE (c)-[:DEVELOPS]->(a)`,
-        { name: company.name, app }
+      `MATCH (c:Company {normalizedName: $normName}), (a:Application {name: $app})
+       MERGE (c)-[:DEVELOPS]->(a)`,
+      { normName: normalizeCompanyName(company.name), app }
       );
       relationshipsCreated++;
     }
@@ -296,13 +298,13 @@ export async function seedGraph(): Promise<SeedSummary> {
     // Create signals
     for (const signal of company.signals) {
       await runQuery(
-        `MATCH (c:Company {name: $name})
-         CREATE (s:Signal {
-           type: $type, date: $date, confidence: $confidence,
-           description: $description, url: $url
-         })
-         MERGE (c)-[:HAS_SIGNAL]->(s)`,
-        { name: company.name, type: signal.type, date: signal.date, confidence: signal.confidence, description: signal.description, url: null }
+      `MATCH (c:Company {normalizedName: $normName})
+       CREATE (s:Signal {
+         type: $type, date: $date, confidence: $confidence,
+         description: $description, url: $url
+       })
+       MERGE (c)-[:HAS_SIGNAL]->(s)`,
+      { normName: normalizeCompanyName(company.name), type: signal.type, date: signal.date, confidence: signal.confidence, description: signal.description, url: null }
       );
       relationshipsCreated++;
     }

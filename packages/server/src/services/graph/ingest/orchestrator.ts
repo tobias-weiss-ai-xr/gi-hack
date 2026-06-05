@@ -1,46 +1,96 @@
 import { runQuery } from "../neo4j.js";
 import { SourceAdapter, SourceConfig, LeadCandidate, IngestionSummary } from "./types.js";
 
-function normalizeCompanyName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9äöüß\s-]/g, "").replace(/\s+/g, " ").trim();
+const LEGAL_SUFFIXES = [
+  " gmbh", " ag", " co. kg", " gmbh & co. kg", " gmbh & co", " gmbh und co",
+  " kg", " ltd", " ltd.", " limited", " inc", " inc.", " corporation", " corp",
+  " llc", " llp", " plc", " pty ltd", " s.a.", " s.a.s", " s.r.l.",
+  " group", " holdings", " holding", " gmbh & co. kg",
+  "the binding site",
+];
+
+function stripLegalSuffix(name: string): string {
+  let cleaned = name.toLowerCase().trim();
+  for (const suffix of LEGAL_SUFFIXES) {
+    if (cleaned.endsWith(suffix)) {
+      cleaned = cleaned.slice(0, -suffix.length).trim();
+    }
+  }
+  return cleaned;
 }
 
-function deduplicateCandidates(candidates: LeadCandidate[]): LeadCandidate[] {
-  const seen = new Map<string, LeadCandidate>();
+function stripParenthetical(name: string): string {
+  return name.replace(/\([^)]*\)/g, "").trim();
+}
+
+export function normalizeCompanyName(name: string): string {
+  return stripLegalSuffix(stripParenthetical(name))
+    .toLowerCase()
+    .replace(/,/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Merge signals from multiple sources for the same company. De-duplicate by type+date+desc. */
+function mergeSignals(candidates: LeadCandidate[]): LeadCandidate {
+  const base = { ...candidates[0] };
+  const seenSignals = new Set<string>();
+  base.signals = [];
   for (const c of candidates) {
-    const key = `${normalizeCompanyName(c.companyName)}::${c.sourceId}`;
-    if (!seen.has(key)) seen.set(key, c);
+    for (const s of c.signals) {
+      const key = `${s.type}::${s.date}::${s.description.slice(0, 80)}`;
+      if (!seenSignals.has(key)) {
+        seenSignals.add(key);
+        base.signals.push(s);
+      }
+    }
   }
-  return Array.from(seen.values());
+  return base;
 }
 
 async function upsertCompany(lead: LeadCandidate): Promise<void> {
+  const normName = normalizeCompanyName(lead.companyName);
+
+  // MERGE by normalized name, store original name as property
   await runQuery(
-    `MERGE (c:Company {name: $name})
-     SET c.domain = COALESCE(c.domain, $domain),
+    `MERGE (c:Company {normalizedName: $normName})
+     SET c.name = $name,
+         c.domain = COALESCE(c.domain, $domain),
          c.description = COALESCE(c.description, $description)`,
-    { name: lead.companyName, domain: lead.domain ?? null, description: lead.description ?? null }
+    { normName, name: lead.companyName, domain: lead.domain ?? null, description: lead.description ?? null }
   );
 
   for (const area of lead.applicationAreas) {
     await runQuery(
-      `MATCH (c:Company {name: $name})
+      `MATCH (c:Company {normalizedName: $normName})
        OPTIONAL MATCH (a:Application {name: $area})
        WITH c, a WHERE a IS NOT NULL
        MERGE (c)-[:DEVELOPS]->(a)`,
-      { name: lead.companyName, area }
+      { normName, area }
     );
   }
 
   for (const signal of lead.signals) {
+    // Dedup signal by type+date+company — create only once
     await runQuery(
-      `MATCH (c:Company {name: $companyName})
-       CREATE (s:Signal {
-         type: $type, date: $date, description: $description,
-         confidence: $confidence, url: $url
+      `MATCH (c:Company {normalizedName: $normName})
+       MERGE (s:Signal {
+         type: $type,
+         date: $date,
+         description: $description
        })
+       ON CREATE SET s.confidence = $confidence, s.url = $url
+       WITH c, s
        MERGE (c)-[:HAS_SIGNAL]->(s)`,
-      { companyName: lead.companyName, ...signal, url: signal.url ?? null }
+      {
+        normName,
+        type: signal.type,
+        date: signal.date,
+        description: signal.description,
+        confidence: signal.confidence,
+        url: signal.url ?? null,
+      }
     );
   }
 }
@@ -73,32 +123,25 @@ export class SourceManager {
     return Array.from(this.pool.keys());
   }
 
-  private async runAdapter(id: string): Promise<IngestionSummary> {
+  /**
+   * Fetch + normalize from a single adapter. Returns candidates instead of upserting,
+   * so the caller can cross-source deduplicate first.
+   */
+  private async fetchAdapterCandidates(id: string): Promise<{
+    candidates: LeadCandidate[];
+    error?: string;
+  }> {
     const entry = this.pool.get(id);
     if (!entry) {
-      return { sourceId: id, fetched: 0, created: 0, failed: 0, errors: [`No adapter "${id}"`] };
+      return { candidates: [], error: `No adapter "${id}"` };
     }
     const { adapter } = entry;
-    const summary: IngestionSummary = { sourceId: id, fetched: 0, created: 0, failed: 0, errors: [] };
     try {
       const rawLeads = await adapter.fetch();
-      summary.fetched = rawLeads.length;
-      const candidates = rawLeads.map((r) => adapter.normalize(r));
-      const deduped = deduplicateCandidates(candidates);
-      for (const lead of deduped) {
-        try {
-          await upsertCompany(lead);
-          summary.created++;
-        } catch (err) {
-          summary.failed++;
-          summary.errors.push(`Upsert fail ${lead.companyName}: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
+      return { candidates: rawLeads.map((r) => adapter.normalize(r)) };
     } catch (err) {
-      summary.failed = summary.fetched;
-      summary.errors.push(`Fetch fail ${id}: ${err instanceof Error ? err.message : String(err)}`);
+      return { candidates: [], error: `${id} fetch: ${err instanceof Error ? err.message : String(err)}` };
     }
-    return summary;
   }
 
   async runAll(): Promise<IngestionSummary[]> {
@@ -106,7 +149,9 @@ export class SourceManager {
       .filter(([, e]) => e.config.enabled)
       .sort(([, a], [, b]) => b.config.weight - a.config.weight);
 
-    const results: IngestionSummary[] = [];
+    // Phase 1: Fetch all adapters in parallel with concurrency pool
+    type FetchResult = { sourceId: string; candidates: LeadCandidate[]; errors: string[] };
+    const fetchResults: FetchResult[] = [];
     const running = new Set<Promise<void>>();
 
     for (const [id] of sorted) {
@@ -114,18 +159,104 @@ export class SourceManager {
         await Promise.race(running);
       }
       const task = (async () => {
-        const summary = await this.runAdapter(id);
-        results.push(summary);
+        const result = await this.fetchAdapterCandidates(id);
+        fetchResults.push({
+          sourceId: id,
+          candidates: result.candidates,
+          errors: result.error ? [result.error] : [],
+        });
       })();
       running.add(task);
       task.finally(() => running.delete(task));
     }
-
     await Promise.allSettled(running);
-    return results;
+
+    // Phase 2: Cross-source deduplication — group candidates by normalized name
+    const groups = new Map<string, LeadCandidate[]>();
+    for (const fr of fetchResults) {
+      for (const c of fr.candidates) {
+        const key = normalizeCompanyName(c.companyName);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(c);
+      }
+    }
+
+    // Phase 3: Merge signals for same-company groups, then upsert
+    const summaries = new Map<string, IngestionSummary>();
+    for (const fr of fetchResults) {
+      summaries.set(fr.sourceId, {
+        sourceId: fr.sourceId,
+        fetched: fr.candidates.length,
+        created: 0,
+        failed: 0,
+        errors: fr.errors,
+      });
+    }
+
+    for (const [, group] of groups) {
+      const merged = mergeSignals(group);
+      // Upsert using the best/preferred company name (longest, most descriptive)
+      const bestName = group.sort((a, b) => b.companyName.length - a.companyName.length)[0];
+      merged.companyName = bestName.companyName;
+      merged.domain = bestName.domain ?? merged.domain;
+
+      // Track which sources contributed to this company
+      const sourceIds = [...new Set(group.map((c) => c.sourceId))];
+
+      try {
+        await upsertCompany(merged);
+        for (const sid of sourceIds) {
+          const s = summaries.get(sid);
+          if (s) s.created++;
+        }
+      } catch (err) {
+        const msg = `Upsert fail ${merged.companyName}: ${err instanceof Error ? err.message : String(err)}`;
+        for (const sid of sourceIds) {
+          const s = summaries.get(sid);
+          if (s) {
+            s.failed++;
+            s.errors.push(msg);
+          }
+        }
+      }
+    }
+
+    return Array.from(summaries.values());
   }
 
   async runSingle(sourceId: string): Promise<IngestionSummary> {
-    return this.runAdapter(sourceId);
+    const result = await this.fetchAdapterCandidates(sourceId);
+    const summary: IngestionSummary = {
+      sourceId,
+      fetched: result.candidates.length,
+      created: 0,
+      failed: 0,
+      errors: result.error ? [result.error] : [],
+    };
+
+    // Group by normalized name (same logic as runAll for consistency)
+    const groups = new Map<string, LeadCandidate[]>();
+    for (const c of result.candidates) {
+      const key = normalizeCompanyName(c.companyName);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(c);
+    }
+
+    for (const [, group] of groups) {
+      const merged = mergeSignals(group);
+      const bestName = group.sort((a, b) => b.companyName.length - a.companyName.length)[0];
+      merged.companyName = bestName.companyName;
+      merged.domain = bestName.domain ?? merged.domain;
+
+      try {
+        await upsertCompany(merged);
+        summary.created++;
+      } catch (err) {
+        summary.failed++;
+        summary.errors.push(`Upsert fail ${merged.companyName}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    return summary;
   }
 }
