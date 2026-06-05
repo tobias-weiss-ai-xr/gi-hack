@@ -1,7 +1,4 @@
-/**
- * Ingestion module index — placeholder.
- * Full implementation in the ingestion pipeline plan.
- * See: docs/superpowers/plans/2026-06-05-leadgraph-ingestion.md
- */
-
+export { type SourceAdapter, type RawLead, type LeadCandidate, type Signal, type SignalType } from "./types.js";
+export { type SourceConfig, type IngestionSummary, type SeedSummary } from "./types.js";
+export { type TierLevel, type ScoredCompany, type ScoreBreakdown, type Disqualifier } from "./types.js";
 export { seedGraph } from "./ontology.js";
