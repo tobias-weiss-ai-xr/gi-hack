@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useScores, type ScoredCompany, type TierLevel } from "../lib/graph";
+import { useBulkAddToPipeline, useFindContacts } from "../lib/pipeline";
 
 // @ts-ignore - TanStack Router type definition issue
 export const Route = createFileRoute("/leads")({
@@ -21,9 +22,9 @@ function TierBadge({ tier }: { tier: TierLevel }) {
   const c = tierConfig[tier];
   return (
     <span style={{
-      fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20,
+      fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 12,
       color: c.color, backgroundColor: c.bg, border: `1px solid ${c.border}`,
-      letterSpacing: "0.5px",
+      letterSpacing: "0.3px", whiteSpace: "nowrap",
     }}>
       {tier === "HOT" ? "🔥" : tier === "WARM" ? "⭐" : "❄️"} {tier}
     </span>
@@ -33,12 +34,9 @@ function TierBadge({ tier }: { tier: TierLevel }) {
 function ScoreBar({ score, tier }: { score: number; tier: TierLevel }) {
   const color = tierConfig[tier].color;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div style={{ width: 80, height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.08)", flexShrink: 0 }}>
-        <div style={{ width: `${score}%`, height: "100%", borderRadius: 3, backgroundColor: color }} />
-      </div>
-      <span style={{ fontSize: 12, color, fontWeight: 700, minWidth: 26 }}>{score}</span>
-    </div>
+    <span style={{ fontSize: 11, color, fontWeight: 700 }}>
+      {score}
+    </span>
   );
 }
 
@@ -257,6 +255,10 @@ export function LeadsPage() {
   const [tierFilter, setTierFilter] = useState<TierLevel | "ALL">("ALL");
   const [segmentFilter, setSegmentFilter] = useState<string>("ALL");
   const [selected, setSelected] = useState<ScoredCompany | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [hoveredCompany, setHoveredCompany] = useState<string | null>(null);
+  const bulkAddToPipeline = useBulkAddToPipeline();
+  const findContacts = useFindContacts();
 
   const filtered = useMemo(() => {
     return companies
@@ -281,15 +283,108 @@ export function LeadsPage() {
     return SEGMENTS.filter((s) => set.has(s));
   }, [companies]);
 
+  const autoAdded = useRef(false);
+
+  useEffect(() => {
+    if (autoAdded.current) return;
+    const hot = companies.filter(c => c.tier === "HOT");
+    if (hot.length === 0) return;
+    autoAdded.current = true;
+    const toAdd = hot.map(c => ({
+      companyName: c.name,
+      contactName: c.contacts?.[0]?.name || undefined,
+      contactEmail: c.contacts?.[0]?.email || undefined,
+      contactRole: c.contacts?.[0]?.role || undefined,
+    }));
+    bulkAddToPipeline.mutateAsync(toAdd);
+  }, [companies, bulkAddToPipeline]);
+
+  const handleFindContacts = async () => {
+    const selectedCompanies = companies.filter(c => selectedIds.has(c.id));
+    for (const company of selectedCompanies) {
+      if (!company.contacts || company.contacts.length === 0) {
+        await findContacts.mutateAsync(company.name);
+      }
+    }
+  };
+
+  const handleFindContactsForCompany = async (company: ScoredCompany) => {
+    if (!company.contacts || company.contacts.length === 0) {
+      await findContacts.mutateAsync(company.name);
+    }
+  };
+
   return (
     <div style={{ padding: "32px 36px", maxWidth: 1100, margin: "0 auto" }}>
 
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "#f0f0f0", margin: 0 }}>Lead Explorer</h1>
-        <p style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
-          {filtered.length} companies · sorted by score
-        </p>
+      <div style={{ marginBottom: 28, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#f0f0f0", margin: 0 }}>Lead Explorer</h1>
+          <p style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
+            {filtered.length} companies · sorted by score
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+          {/* Find contacts button */}
+          {selectedIds.size > 0 && (
+            <button
+              onClick={handleFindContacts}
+              disabled={findContacts.isPending}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 8,
+                border: "1px solid rgba(22, 163, 74, 0.4)",
+                backgroundColor: findContacts.isPending ? "rgba(22, 163, 74, 0.08)" : "rgba(22, 163, 74, 0.15)",
+                color: findContacts.isPending ? "#6b7280" : "#86efac",
+                fontSize: 12, fontWeight: 700,
+                cursor: findContacts.isPending ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", gap: 6,
+              }}
+            >
+              <span>🔍</span>
+              {findContacts.isPending ? "Finding contacts..." : "Find contacts for selected"}
+            </button>
+          )}
+          {/* Bulk add selected button */}
+          {selectedIds.size > 0 && (
+            <button
+              onClick={async () => {
+                const selectedCompanies = companies.filter(c => selectedIds.has(c.id));
+                const toAdd = selectedCompanies.map(c => ({
+                  companyName: c.name,
+                  contactName: c.contacts?.[0]?.name || undefined,
+                  contactEmail: c.contacts?.[0]?.email || undefined,
+                  contactRole: c.contacts?.[0]?.role || undefined,
+                }));
+                await bulkAddToPipeline.mutateAsync(toAdd);
+                setSelectedIds(new Set());
+              }}
+              disabled={bulkAddToPipeline.isPending}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 8,
+                border: "1px solid rgba(99, 102, 241, 0.4)",
+                backgroundColor: bulkAddToPipeline.isPending ? "rgba(99, 102, 241, 0.08)" : "rgba(99, 102, 241, 0.15)",
+                color: bulkAddToPipeline.isPending ? "#6b7280" : "#a5b4fc",
+                fontSize: 12, fontWeight: 700,
+                cursor: bulkAddToPipeline.isPending ? "not-allowed" : "pointer",
+              }}
+            >
+              {bulkAddToPipeline.isPending ? "Adding..." : `Add ${selectedIds.size} selected to pipeline`}
+            </button>
+          )}
+          {bulkAddToPipeline.isSuccess && (
+            <div style={{ fontSize: 11, color: "#86efac", maxWidth: 250 }}>
+              ✓ Added to pipeline successfully
+            </div>
+          )}
+          {bulkAddToPipeline.isError && (
+            <div style={{ fontSize: 11, color: "#fca5a5", maxWidth: 250 }}>
+              ✗ Failed to add: {(bulkAddToPipeline.error as Error)?.message}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -358,13 +453,27 @@ export function LeadsPage() {
         {/* Table header */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "200px 180px 140px 80px 80px 140px 1fr",
+          gridTemplateColumns: "40px 200px 180px 140px 75px 50px 140px 1fr",
           padding: "10px 20px",
           borderBottom: "1px solid rgba(255,255,255,0.06)",
           fontSize: 11, fontWeight: 700, color: "#777",
           letterSpacing: "0.6px", textTransform: "uppercase",
           alignItems: "center",
         }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={selectedIds.size > 0 && filtered.length > 0 ? filtered.every(c => selectedIds.has(c.id)) : false}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedIds(new Set(filtered.map(c => c.id)));
+                } else {
+                  setSelectedIds(new Set());
+                }
+              }}
+              style={{ cursor: "pointer", width: 16, height: 16 }}
+            />
+          </div>
           <span>Company</span>
           <span>Contact</span>
           <span>Role / Email</span>
@@ -394,26 +503,68 @@ export function LeadsPage() {
                   {contacts.length === 0 ? (
                     <div
                       onClick={() => setSelected(company)}
+                      onMouseEnter={() => setHoveredCompany(company.id)}
+                      onMouseLeave={() => setHoveredCompany(null)}
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "200px 180px 140px 80px 80px 140px 1fr",
+                        gridTemplateColumns: "40px 200px 180px 140px 75px 50px 140px 1fr",
                         padding: "14px 20px",
                         borderBottom: "1px solid rgba(255,255,255,0.04)",
                         cursor: "pointer",
                         transition: "background 0.1s",
                         alignItems: "center",
+                        backgroundColor: hoveredCompany === company.id ? "rgba(255,255,255,0.03)" : "transparent",
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)")}
-                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
                     >
+                      {/* Checkbox */}
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(company.id)}
+                          onChange={(e) => {
+                            const newSelected = new Set(selectedIds);
+                            if (e.target.checked) {
+                              newSelected.add(company.id);
+                            } else {
+                              newSelected.delete(company.id);
+                            }
+                            setSelectedIds(newSelected);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ cursor: "pointer", width: 16, height: 16 }}
+                        />
+                      </div>
+
                       {/* Company name */}
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: "#e0e0e0" }}>{company.name}</div>
                         <div style={{ fontSize: 11, color: "#777", marginTop: 2 }}>{company.domain ?? "—"}</div>
                       </div>
 
-                      {/* No contact */}
-                      <span style={{ fontSize: 12, color: "#555", fontStyle: "italic" }}>No contact</span>
+                       <button
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           handleFindContactsForCompany(company);
+                         }}
+                         disabled={findContacts.isPending}
+                         style={{
+                           padding: "6px 12px",
+                           borderRadius: 6,
+                           border: "1px solid rgba(22, 163, 74, 0.3)",
+                           backgroundColor: findContacts.isPending ? "rgba(22, 163, 74, 0.08)" : "rgba(22, 163, 74, 0.12)",
+                           color: findContacts.isPending ? "#6b7280" : "#86efac",
+                           fontSize: 11,
+                           fontWeight: 600,
+                           cursor: findContacts.isPending ? "not-allowed" : "pointer",
+                           display: "flex",
+                           alignItems: "center",
+                           gap: 4,
+                           transition: "all 0.2s ease",
+                         }}
+                       >
+                         <span>{findContacts.isPending ? "🔍" : "✨"}</span>
+                         {findContacts.isPending ? "Searching..." : "Find contacts"}
+                       </button>
 
                       {/* Empty context */}
                       <span></span>
@@ -449,18 +600,45 @@ export function LeadsPage() {
                       <div
                         key={`${company.id}-${contact.id}`}
                         onClick={() => setSelected(company)}
+                        onMouseEnter={() => setHoveredCompany(company.id)}
+                        onMouseLeave={() => setHoveredCompany(null)}
                         style={{
                           display: "grid",
-                          gridTemplateColumns: "200px 180px 140px 80px 80px 140px 1fr",
+                          gridTemplateColumns: "40px 200px 180px 140px 75px 50px 140px 1fr",
                           padding: "14px 20px",
                           cursor: "pointer",
                           transition: "background 0.1s",
                           alignItems: "center",
-                          backgroundColor: ci > 0 ? "rgba(255,255,255,0.01)" : "transparent",
+                          backgroundColor: hoveredCompany === company.id
+                            ? "rgba(255,255,255,0.03)"
+                            : ci > 0
+                            ? "rgba(255,255,255,0.01)"
+                            : "transparent",
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)")}
-                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = ci > 0 ? "rgba(255,255,255,0.01)" : "transparent")}
                       >
+                        {/* Checkbox - only show on first row */}
+                        {ci === 0 ? (
+                          <div style={{ display: "flex", alignItems: "center" }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(company.id)}
+                              onChange={(e) => {
+                                const newSelected = new Set(selectedIds);
+                                if (e.target.checked) {
+                                  newSelected.add(company.id);
+                                } else {
+                                  newSelected.delete(company.id);
+                                }
+                                setSelectedIds(newSelected);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ cursor: "pointer", width: 16, height: 16 }}
+                            />
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", width: "px", justifyContent: "center" }}></div>
+                        )}
+
                         {/* Company name - only show on first row */}
                         {ci === 0 ? (
                           <div>
@@ -481,18 +659,18 @@ export function LeadsPage() {
                         </div>
 
                         {/* Tier - only show on first row */}
-                        {ci === 0 && <TierBadge tier={company.tier} />}
+                        <>{ci === 0 ? <TierBadge tier={company.tier} /> : null}</>
 
                         {/* Score bar - only show on first row */}
-                        {ci === 0 && <ScoreBar score={company.score} tier={company.tier} />}
+                        <>{ci === 0 ? <ScoreBar score={company.score} tier={company.tier} /> : null}</>
 
                         {/* Segment - only show on first row */}
-                        {ci === 0 && (
-                          <span style={{ fontSize: 12, color: "#888" }}>{company.segment ?? "—"}</span>
-                        )}
+                        <span style={{ fontSize: 12, color: "#888" }}>
+                          {ci === 0 ? (company.segment ?? "—") : ""}
+                        </span>
 
                         {/* Signal types - only show on first row */}
-                        {ci === 0 && (
+                        <>{ci === 0 ? (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                             {[...new Set(company.signals?.map((s) => s.type) ?? [])].slice(0, 3).map((type) => (
                               <span key={type} style={{
@@ -508,7 +686,7 @@ export function LeadsPage() {
                               <span style={{ fontSize: 10, color: "#777" }}>+{company.signals.length - 3}</span>
                             )}
                           </div>
-                        )}
+                        ) : null}</>
                       </div>
                     ))
                   )}
