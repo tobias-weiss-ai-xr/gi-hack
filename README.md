@@ -2,39 +2,14 @@
 
 A ready-to-hack boilerplate for the **StartMiUp Hackathon – AI for Mittelhessen**.
 
-![Pipeline CRM Teaser](docs/teaser.png)
-
-## 🏗️ Pipeline MVP — Demo
-
-This branch (`feature/pipeline-mvp`) builds on the boilerplate with a demo-ready Pipeline CRM and an agentic outreach workflow:
-
-**Pipeline CRM:** A 6-stage Kanban board (New → Contacted → Meeting → Proposal → Closed Won/Lost) with 10 demo leads, 57 activity entries, and realistic DACH IVD contacts — all generated idempotently via `npm run demo:pipeline`.
-
-**Agentic Outreach Workflow** (design spec in `AGENTIC_OUTREACH_WORKFLOW.md`):
-- **Lead Qualifier** — scores/scans for HOT/WARM leads without existing contacts
-- **Company Profile Builder** — extracts signals, product fit, application overlap
-- **Outreach Email Generator** — AI-personalized cold emails from company profile
-- **Preference Confirmation** — GDPR-compliant landing page where customer confirms their own data (consent, contact method, interest areas, timeline)
-- **Outreach Orchestrator** — coordinates the full pipeline
-
-**Demo Script:**
-```bash
-npm run demo:pipeline
-# Generates 10 leads across all 6 pipeline stages with realistic stories
-```
-
-**Preference Page:** `packages/client/src/routes/preferences.lazy.tsx` — standalone form with consent checkbox, contact method selector (Email/Call/Both), interest areas, timeline, and notes. Requires route registration + backend endpoints for full flow.
-
-**Dashboard fixes:** All frontend API hooks (`useScores`, `useGraphStats`, `useGraphHealth`, `useSources`) were fixed to properly unwrap the `{ok, data}` response envelope — home page and leads page no longer crash.
-
-## What's Inside
-
 | Layer | Technology |
 |---|---|
 | Frontend | React 19 + Vite + TanStack Router + TanStack Query + Tailwind CSS v4 |
 | Backend | Express + TypeScript (tsx watch) |
 | Graph DB | Neo4j 5 Community + APOC (Docker) |
 | AI | Vercel AI SDK (OpenAI, swappable) |
+
+---
 
 ## Quick Start
 
@@ -44,16 +19,14 @@ npm run demo:pipeline
 # 1. Start Neo4j
 docker compose up -d neo4j
 
-# 2. Bootstrap database OR skip to step 3 for empty DB
-# Option A: Load pre-built leads (recommended - fastest start)
+# 2. Load pre-built lead data (optional, skip for empty DB)
 docker compose --profile bootstrap run bootstrap
-# Option B: Or run: npm run db:bootstrap
 
 # 3. Configure environment
 cp .env.example .env
 # Edit .env — add your OPENAI_API_KEY (optional, for AI features)
 
-# 4. Install dependencies  
+# 4. Install dependencies
 npm install
 
 # 5. Start development
@@ -63,131 +36,65 @@ npm run dev
 Open **http://localhost:5173** — client on :5173, server on :3001, Neo4j Browser on :7474.
 
 **Database Options:**
-- **Bootstrap** (fastest): Pre-loaded with 1,300 companies, 1,800 signals, scored leads
-- **Live Ingestion**: Fresh data from FDA, GitHub, ClinicalTrials, OpenAlex, etc. (requires API keys)
-- **Empty**: Start from scratch, use `/api/graph/seed` to load base ontology only
+| Option | Command | What you get |
+|--------|---------|-------------|
+| **Bootstrap** (fastest) | `docker compose --profile bootstrap run bootstrap` | 1,300 companies, 1,800 signals, scored leads |
+| **Live ingest** | `npm run ingest:seed` | Fresh data from 8 real API sources |
+| **Empty** | Start without step 2 | Base ontology via `/api/graph/seed` |
 
-### Database Bootstrap & Import
+---
 
-The application includes a pre-built Neo4j bootstrap with ready-to-use lead data. This allows you to quickly get started with populated companies, signals, and scoring without running the full ingestion pipeline.
+## Data
 
-**Pre-loaded Data:**
-- ~1,300 companies across IVD manufacturers, diagnostics, and life sciences
-- ~1,800 signals (FDA clearances, clinical trials, publications, patents, conferences)
-- Applications and products for context matching
-- Pre-computed lead scores with HOT/WARM/COLD tiers
-
-**Bootstrap Methods:**
+### Bootstrap (pre-built snapshot)
 
 ```bash
-# Start Neo4j first (required)
+# Load data
 docker compose up -d neo4j
+docker compose --profile bootstrap run bootstrap   # Recommended
+# or: npm run db:bootstrap
 
-# Option A: Docker bootstrap service (recommended for fresh installs)
-docker compose --profile bootstrap run bootstrap
-# This automatically waits for Neo4j to be ready then loads the bootstrap data
+# Re-snapshot current DB state
+npm run db:export                # Generates packages/server/db/bootstrap.cypher
 
-# Option B: Direct npm script (for re-running after data changes)
-npm run db:bootstrap
-# Requires: NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD env vars
-# (Defaults: bolt://localhost:7687, neo4j, password)
-
-# Option C: Custom environment
-NEO4J_URI="bolt://localhost:7687" NEO4J_PASSWORD="yourpassword" npm run db:bootstrap
+# Reset and reload
+docker compose down -v && docker compose up -d neo4j && npm run db:bootstrap
 ```
 
-**How Bootstrap Works:**
+Bootstrap executes 4,765+ idempotent Cypher statements creating constraints, ontology, companies, signals, and relationships.
 
-The bootstrap process executes 4,765+ idempotent Cypher statements from `packages/server/db/bootstrap.cypher`:
-
-1. **Constraints & Indices:** Creates uniqueness constraints and indexes for fast queries
-2. **Ontology:** Seeds applications (diagnostics categories) and Siemens products as reference data
-3. **Companies:** Loads company profiles with domains, segments, and descriptions
-4. **Signals:** Imports signals attributed to companies (FDA clearances, trials, etc.)
-5. **Relationships:** Links companies to signals, applications, and products
-
-**Refreshing Bootstrap Data:**
-
-If you modify `packages/server/db/bootstrap.cypher`, re-run the bootstrap:
+### Live Ingestion (fresh data from APIs)
 
 ```bash
-# Clean and restart to test changes
-docker compose down -v          # Removes old Neo4j data
-docker compose up -d neo4j      # Fresh Neo4j instance
-npm run db:bootstrap            # Load updated bootstrap
-```
-
-**Creating New Bootstrap Snapshots:**
-
-To export the current Neo4j state as a reusable bootstrap file:
-
-```bash
-npm run db:export
-# Generates: packages/server/db/bootstrap.cypher
-# Contains all current data as idempotent MERGE statements
-```
-
-**Troubleshooting:**
-
-- **"Database unavailable"**: Neo4j is still starting - wait 10-15 seconds after `docker compose up -d neo4j`
-- **"Authentication failure"**: Check Neo4j is running with default password (`password`) or set `NEO4J_PASSWORD` env var
-- **Partial import**: Check Neo4j logs with `docker compose logs neo4j` - bootstrap continues on statement errors
-
-### Live Data Ingestion (Alternative to Bootstrap)
-
-For fresh data from external sources, the application supports 12 real-time ingestion adapters:
-
-**Available Data Sources:**
-| Source | Type | Coverage | Signals |
-|--------|------|----------|---------|
-| FDA 510(k) | Real API | US medical devices | FDA_CLEARANCE |
-| GitHub | Real API | Diagnostic orgs & repos | GITHUB_ACTIVITY |
-| ClinicalTrials.gov | Real API | Global clinical trials | CLINICAL_TRIAL |
-| OpenAlex | Real API | Research publications | RESEARCH_PUBLICATION |
-| DRKS | Real API | German trials registry | CLINICAL_TRIAL |
-| EPO OPS | Real API | European patents | PATENT |
-| MEDICA | Web Scraping | DACH conference exhibitors | CONFERENCE |
-| BMBF FÖKAT | CSV Export | German funded projects | FUNDING |
-| Patent|Hiring|Conference|Funding | Stub/Simulated | Fallback data | Various |
-
-**Running Live Ingestion:**
-
-```bash
-# Seed ontology first (required before ingestion)
-curl -X POST http://localhost:3001/api/graph/seed
-
-# Run all ingestion adapters
-npm run ingest
-# Or via API: curl -X POST http://localhost:3001/api/graph/ingest
-
-# Run specific source only
-npm run ingest -- --source=fda-510k
-# Available sources: fda-510k, github, clinical-trials, openalex, drks, epo,
-# medica, foekat, patent-stub, hiring-stub, conference-stub, funding-stub
-
-# Run seed + full pipeline (recommended for fresh setup)
+# Seed ontology + run all adapters + score
 npm run ingest:seed
-# Equivalent to: seed → ingest all sources → score all companies
+
+# Or step by step:
+curl -X POST http://localhost:3001/api/graph/seed          # Ontology
+npm run ingest                                              # All 12 adapters
+npm run score                                               # Compute HOT/WARM/COLD
 ```
 
-**Scoring Pipeline:**
+| Source | Type | Signal | Auth |
+|--------|------|--------|------|
+| FDA 510(k) | Real API | FDA_CLEARANCE | None |
+| GitHub | Real API | GITHUB_ACTIVITY | Token (opt) |
+| ClinicalTrials.gov | Real API | CLINICAL_TRIAL | None |
+| OpenAlex | Real API | RESEARCH_PUBLICATION | None |
+| DRKS (DE) | Real API | CLINICAL_TRIAL | None |
+| EPO OPS (EP) | Real API | PATENT | OAuth2 (free reg.) |
+| MEDICA (DE) | Scrape | CONFERENCE | None |
+| BMBF FÖKAT (DE) | CSV export | FUNDING | None |
+| 4 stubs | Simulated | Patent/Hiring/Conf./Funding | None |
 
-After ingestion, run the scoring algorithm to compute lead rankings:
+### Scoring
 
-```bash
-# Score all companies
-npm run score
-# Or via API: curl -X GET http://localhost:3001/api/graph/score
+```
+Signal Score (0-40) + Product Fit (0-30) + Segment Bonus (0-20) + Recency Bonus (0-10)
+→ Total (0-100) → Tier: HOT ≥ 70 / WARM ≥ 40 / COLD < 40
 ```
 
-The scoring algorithm computes:
-- **Signal Score** (0-40): Weighted sum of signal confidence × recency  
-- **Product Fit** (0-30): Application overlap with Siemens products
-- **Segment Bonus** (0-20): Industry segment relevance (IVD=20, CDMO=15, etc.)
-- **Recency Bonus** (0-10): Time since last activity signal
-- **Total Score** (0-100): Sum of components → Tier assignment (HOT≥70, WARM≥40, COLD<40)
-
-**Note:** Live ingestion requires API keys and network access. Use bootstrap for quick start, then run live ingestion for fresh data.
+---
 
 ## Project Structure
 
@@ -201,404 +108,104 @@ gi-hack/
 │   ├── server/          # Express API
 │   │   └── src/
 │   │       ├── routes/  # API endpoints
-│   │       └── services/# Neo4j + AI services
+│   │       └── services/# Neo4j + AI + pipeline services
 │   └── shared/          # TypeScript types
 ├── docker-compose.yml   # Neo4j service
 ├── .env.example         # Config template
-└── docs/                # Architecture documentation
+└── docs/                # Design docs, architecture diagrams
 ```
 
-## API Endpoints
+---
 
+## API Reference
+
+### Graph & Ingestion
 | Method | Path | Description |
-|---|---|---|
+|--------|------|-------------|
 | GET | `/api/health` | Server health check |
 | GET | `/api/graph/health` | Neo4j connectivity check |
-| POST | `/api/graph/query` | Execute Cypher query |
-| POST | `/api/graph/seed` | Seed ontology (applications, products, Siemens) |
-| POST | `/api/graph/ingest` | Run live ingest (all real sources or `?source=` specific) |
+| POST | `/api/graph/seed` | Seed ontology (applications, products, companies) |
+| POST | `/api/graph/ingest` | Run live ingestion (all or `?source=`) |
 | POST | `/api/graph/ingest/status/:jobId` | Async ingest job progress |
-| GET | `/api/graph/ingest/sources` | Registered adapters + health status |
-| GET | `/api/graph/score` | Score all prospects (or manually via npm run score) |
-| GET | `/api/graph/stats` | Graph node/relationship counts |
-| DELETE | `/api/graph/ingest` | Truncate graph (reset to empty) |
+| GET | `/api/graph/ingest/sources` | Registered adapters + health |
+| GET | `/api/graph/score` | Score all prospects (HOT/WARM/COLD) |
+| GET | `/api/graph/stats` | Node/relationship counts |
+| DELETE | `/api/graph/ingest` | Truncate graph |
+| POST | `/api/graph/query` | Execute arbitrary Cypher |
 
-**Data Loading Options:**
-- **Bootstrap**: `npm run db:bootstrap` — Loads pre-built snapshot fastest
-- **Live Ingest**: `npm run ingest` — Fetches fresh data from 12 real sources
-| GET | `/api/pipeline/stages` | Pipeline stage definitions |
+### Pipeline CRM
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/pipeline/stages` | Stage definitions |
 | GET | `/api/pipeline/leads` | All pipeline leads |
 | POST | `/api/pipeline/start` | Start pipeline tracking |
 | PUT | `/api/pipeline/:id/advance` | Advance to next stage |
-| PUT | `/api/pipeline/:id/regress` | Move to any previous stage |
+| PUT | `/api/pipeline/:id/regress` | Move to any stage |
 | POST | `/api/pipeline/:id/activity` | Add activity note |
-| GET | `/api/pipeline/:id/activity` | Get activity history |
-| POST | `/api/ai/ask` | Ask AI (optionally with graph context) |
+| GET | `/api/pipeline/:id/activity` | Activity history |
+
+### AI
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/ai/ask` | Chat with graph context |
+| POST | `/api/ai/enrich/:companyId` | AI enrichment (segment, domain) |
+| POST | `/api/ai/outreach/:companyId` | Generate outreach email |
+| GET | `/api/ai/explain/:companyId` | Score breakdown explanation |
+
+---
 
 ## Architecture
 
-See [`docs/superpowers/specs/2026-06-04-ai-graph-tanstack-boilerplate-design.md`](docs/superpowers/specs/2026-06-04-ai-graph-tanstack-boilerplate-design.md) for the full arc42 design document.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full architecture diagram (frontend → API → Neo4j → data sources), node/edge model, data flow, and component design.
+
+Scoring algorithm: [`docs/superpowers/specs/2026-06-05-leadgraph-ingestion-design.md`](docs/superpowers/specs/2026-06-05-leadgraph-ingestion-design.md)
 
 ---
 
-# LeadGraph — Siemens Healthineers Challenge
+## Implementation Status
 
-**Problem:** Siemens Healthineers produces biological intermediates (proteins, antibodies, latex particles, blockers) at their Marburg site but lacks a B2B sales structure to identify and prioritize potential buyers.
+| Phase | What | Who | Status |
+|-------|------|-----|--------|
+| **1** | Backend: ingest pipeline, scoring, 4 stubs + 4 real adapters | 🛠️ Tobias | ✅ Done |
+| **1.5** | DACH sources: DRKS, EPO OPS, MEDICA, FÖKAT + ClinicalTrials, OpenAlex | 🛠️ Tobias | ✅ Done |
+| **2** | Dashboard: API hooks, home page, Lead Explorer, Admin panel | 🎨 Reyyan | 🔶 In progress (skeleton exists) |
+| **3** | Pipeline CRM: data model, API, kanban, hooks | 📋 Beyza | ✅ Done |
+| **4** | AI layer: enrichment, outreach, explain | 🤖 Zeynep | ✅ Services done, ⏳ UI pending |
+| **5** | Verification: typecheck, smoke test | ✅ All | ❌ See below |
 
-**Solution:** Neo4j knowledge graph + AI lead scoring platform that automatically discovers, ranks, and surfaces diagnostic companies actively developing new assays.
+**Known gaps:**
+- Client typecheck: pipeline.tsx imports don't match hooks file (~20 errors)
+- Server typecheck: 2 unused vars in export-bootstrap.ts
+- Pre-built bootstrap.cypher may be stale — run `npm run db:export` to refresh
 
-See the full spec at [`docs/superpowers/specs/2026-06-05-leadgraph-ingestion-design.md`](docs/superpowers/specs/2026-06-05-leadgraph-ingestion-design.md) and the implementation plan at [`docs/superpowers/plans/2026-06-05-leadgraph-ingestion.md`](docs/superpowers/plans/2026-06-05-leadgraph-ingestion.md).
-
----
-
-## Full Architecture Diagram
-
-```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                          LEADGRAPH — FULL SOFTWARE ARCHITECTURE                   │
-│              Siemens Healthineers — AI Lead Identification Platform                │
-└──────────────────────────────────────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│  FRONTEND (React 19 + Vite + TanStack Router/Query + Tailwind v4)                │
-│  Layers: routes/ → pages, lib/ → API hooks, components/ → reusable UI             │
-│                                                                                  │
-│  ┌──────────────────────────────┐  ┌──────────────────────────────┐              │
-│  │ Dashboard (Home) Page        │  │ Lead Explorer Page            │              │
-│  │  ├─ Pipeline Summary Cards   │  │  ├─ Score-sorted DataTable    │              │
-│  │  │  🔥 HOT: X  ⭐ WARM: Y   │  │  ├─ Filter bar (tier,segment) │              │
-│  │  │     COLD: Z               │  │  ├─ Company detail drawer    │              │
-│  │  ├─ Source Health Status     │  │  │   ├─ Signals timeline     │              │
-│  │  ├─ Top 5 leads card         │  │  │   ├─ Score breakdown bar  │              │
-│  │  └─ [Run Ingest] button      │  │  │   └─ Outreach hook        │              │
-│  └──────────────────────────────┘  └──────────────────────────────┘              │
-│  ┌──────────────────────────────┐  ┌──────────────────────────────┐              │
-│  │ Pipeline Kanban Page         │  │ Ingest Control Panel         │              │
-│  │  ├─ Columns: New → Contacted │  │  ├─ [Seed Ontology] button   │              │
-│  │  │  → Meeting → Proposal     │  │  ├─ Run per-source ingest    │              │
-│  │  │  → Closed Won/Lost        │  │  └─ View ingestion logs     │              │
-│  │  ├─ Drag leads between cols  │  │                              │              │
-│  │  └─ Activity timeline per    │  │                              │              │
-│  │     lead (notes, status      │  │                              │              │
-│  │     changes, emails)         │  │                              │              │
-│  └──────────────────────────────┘  └──────────────────────────────┘              │
-└──────────────────────────────────────────────────────────────────────────────────┘
-           │                                     ▲
-           │  HTTP / JSON (TanStack Query)       │
-           ▼                                     │
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│  API SERVER (Express + TypeScript — :3001)                                        │
-│  Routes: /api/graph/*, /api/pipeline/*, /api/ai/*                                 │
-│                                                                                  │
-│  ┌───────────────────────────────────────────────────────────────────────────┐   │
-│  │                     INGESTION LAYER (services/graph/ingest/)                │   │
-│  │                                                                           │   │
-│  │  ┌───────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  SourceManager (KeeLead-inspired) — pool=3, weight-sorted         │    │   │
-│  │  │                                                                   │    │   │
-│  │  │  FDA=50 │ GitHub=40 │ ClinicalTrials=30 │ OpenAlex=28 │ EPatent=23  │    │   │
-│  │  │  DRKS=22 │ Patent=25 │ Hiring=20 │ Medica=18 │ Foekat=15 │ Conf=15  │    │   │
-│  │  │  Funding=10                                                       │    │   │
-│  │  │                                                                   │    │   │
-│  │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐  │    │   │
-│  │  │  │FDA 510(k)│ │  GitHub  │ │ Clinical │ │ OpenAlex │ │  EPO   │  │    │   │
-│  │  │  │  REAL    │ │  REAL    │ │  Trials  │ │  REAL    │ │  OPS   │  │    │   │
-│  │  │  │          │ │          │ │  REAL    │ │ (pubs)   │ │ (pat.) │  │    │   │
-│  │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └────────┘  │    │   │
-│  │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐  │    │   │
-│  │  │  │  DRKS    │ │  MEDICA  │ │  FÖKAT   │ │  4 Stubs │ │        │  │    │   │
-│  │  │  │  REAL    │ │  REAL    │ │  REAL    │ │ (pat/hire │ │        │  │    │   │
-│  │  │  │ (trials) │ │ (conf.)  │ │ (grants) │ │ /conf/fnd)│ │        │  │    │   │
-│  │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └────────┘  │    │   │
-│  │  └───────────────────────────────────────────────────────────────────┘    │   │
-│  │                                                                           │   │
-│  │  ┌───────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  SCORING PIPELINE (services/graph/scoring/)                        │    │   │
-│  │  │  Reads: Company → HAS_SIGNAL → Signal                              │    │   │
-│  │  │         Company → DEVELOPS → Application                           │    │   │
-│  │  │                                                                   │    │   │
-│  │  │  For each Company WITHOUT SUPPLIES_TO relationship to Siemens:     │    │   │
-│  │  │   1. SignalScore = Σ(weight × confidence × recency)       [0-40]  │    │   │
-│  │  │   2. ProductFit = appOverlapRatio × 30                     [0-30]  │    │   │
-│  │  │   3. SegmentBonus: IVD=20 / CDMO=15 / Supplier=10 / ...   [0-20]  │    │   │
-│  │  │   4. RecencyBonus: ≤3mo=10 / ≤6mo=7 / ≤12mo=4 / >12mo=1  [0-10]  │    │   │
-│  │  │   5. Check hard disqualifiers (no signals, no domain, ...)        │    │   │
-│  │  │   6. Total = signal + fit + segment + recency              [0-100] │    │   │
-│  │  │   7. Tier: HOT ≥ 70 / WARM ≥ 40 / COLD < 40                      │    │   │
-│  │  │   8. Generate outreachHook from strongest signal type             │    │   │
-│  │  └───────────────────────────────────────────────────────────────────┘    │   │
-│  │                                                                           │   │
-│  │  ┌───────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  PIPELINE CRM (services/graph/pipeline/)                          │    │   │
-│  │  │                                                                   │    │   │
-│  │  │  Nodes:    (:Contact), (:Activity), (:PipelineStage)              │    │   │
-│  │  │  Edges:    (c)-[:CONTACT_AT]->(Company)                           │    │   │
-│  │  │            (c)-[:HAS_ACTIVITY]->(:Activity {type, note, date})    │    │   │
-│  │  │            (c)-[:IN_STAGE]->(:PipelineStage {stage, enteredAt})    │    │   │
-│  │  │                                                                   │    │   │
-│  │  │  Stages:  New → Contacted → Meeting → Proposal → Closed Won/Lost  │    │   │
-│  │  └───────────────────────────────────────────────────────────────────┘    │   │
-│  │                                                                           │   │
-│  │  ┌───────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  AI LAYER (services/ai/)                                           │    │   │
-│  │  │                                                                   │    │   │
-│  │  │  Enrich:    (Company.name + signals) → LLM → (segment, domain,    │    │   │
-│  │  │              applications, description)                             │    │   │
-│  │  │  Outreach:  (Company + signals + tier) → LLM → (personalized      │    │   │
-│  │  │              cold email with product recommendation)                │    │   │
-│  │  │  Explain:   (Company + breakdown) → LLM → (plain-text "why this   │    │   │
-│  │  │              lead scores what it does" justification)               │    │   │
-│  │  └───────────────────────────────────────────────────────────────────┘    │   │
-│  └───────────────────────────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────────────────────────┘
-           │
-           │  runQuery() — neo4j-driver (Bolt :7687)
-           ▼
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│  NEO4j KNOWLEDGE GRAPH (Docker — bolt://localhost:7687, Browser :7474)            │
-│                                                                                  │
-│  ┌───────────────────────────────────────────────────────────────────────────┐   │
-│  │  Node Types                   │  Relationships                           │   │
-│  │                               │                                          │   │
-│  │  (:Company)                   │  (c)-[:SUPPLIES]->(:Product)             │   │
-│  │    .name (UNIQUE)             │  (c)-[:DEVELOPS]->(:Application)         │   │
-│  │    .domain (INDEXED)          │  (c)-[:HAS_SIGNAL]->(:Signal)            │   │
-│  │    .segment                    │  (p)-[:USED_IN]->(:Application)          │   │
-│  │    .region                     │  (c)-[:CONTACT_AT]->(:Contact)          │   │
-│  │                               │  (c)-[:IN_STAGE]->(:PipelineStage)       │   │
-│  │  (:Application)               │  (c)-[:HAS_ACTIVITY]->(:Activity)        │   │
-│  │    .name (UNIQUE)             │                                          │   │
-│  │    .category                   │                                          │   │
-│  │    .marketSize                 │                                          │   │
-│  │                               │                                          │   │
-│  │  (:Product)                    │                                          │   │
-│  │    .catalogId                  │                                          │   │
-│  │    .name                       │                                          │   │
-│  │    .category                   │                                          │   │
-│  │                               │                                          │   │
-│  │  (:Signal)                     │                                          │   │
-│  │    .type (INDEXED)             │                                          │   │
-│  │    .date                       │                                          │   │
-│  │    .confidence (0-1)           │                                          │   │
-│  │    .description                │                                          │   │
-│  │    .url                        │                                          │   │
-│  │                               │                                          │   │
-│  │  (:Contact)                    │                                          │   │
-│  │    .name, .email, .role        │                                          │   │
-│  │                               │                                          │   │
-│  │  (:PipelineStage)              │                                          │   │
-│  │    .stage, .enteredAt          │                                          │   │
-│  │                               │                                          │   │
-│  │  (:Activity)                   │                                          │   │
-│  │    .type, .note, .date         │                                          │   │
-│  └───────────────────────────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────────────────────────┘
-           ▲
-           │
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│  DATA SOURCES (External)                                                           │
-│                                                                                  │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐          │
-│  │ api.fda.gov  │ │ api.github   │ │ clinicaltrials│ │ api.openalex │          │
-│  │ /device/510k │ │ .com/search  │ │ .gov         │ │ .org/works   │          │
-│  │ FDA 510(k)   │ │ Diagnostic   │ │ Clinical     │ │ Research     │          │
-│  │ REAL ── 8    │ │ keyword org  │ │ Trials       │ │ publications │          │
-│  │ product code │ │ detection    │ │ REAL (US)    │ │ REAL         │          │
-│  │ filters      │ │ REAL         │ │              │ │              │          │
-│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘          │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐          │
-│  │ drks.de      │ │ epo.org      │ │ medica-tradefair│ foerderportal │          │
-│  │ /search/     │ │ /ops/restful │ │ .com/vis/v1  │ .bund.de/    │          │
-│  │ download/all │ │ DE patents   │ │ Exhibitor DB │ foekat       │          │
-│  │ DRKS (DE)    │ │ by IPC codes │ │ MEDICA (DE)  │ FÖKAT grants │          │
-│  │ REAL (DACH)  │ │ REAL (DACH)  │ │ REAL (DACH)  │ REAL (DACH)  │          │
-│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘          │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐          │
-│  │ Stub: Patent │ │ Stub: Hiring │ │ Stub: Conf.  │ │ Stub: Funding│          │
-│  │ (fallback)   │ │ (fallback)   │ │ (fallback)   │ │ (fallback)   │          │
-│  │ 5 simulated  │ │ 5 simulated  │ │ 5 simulated  │ │ 4 simulated  │          │
-│  │ patent recs  │ │ R&D/QA roles │ │ exhibitor    │ │ VC/grant recs│          │
-│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘          │
-└──────────────────────────────────────────────────────────────────────────────────┘
-
-
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│  REFERENCE REPOSITORY BORROWINGS (sources/, for inspiration only)                  │
-│                                                                                  │
-│  KeeLead (MIT)  ──→ SourceManager concurrency, per-source weights & config       │
-│  Gitsneak (MIT) ──→ GitHub org detection, profile scraping, API caching          │
-│  OpenGTM (MIT)  ──→ Tier system (HOT/WARM/COLD), ICP profiles, segment scoring   │
-│  Lead Engine ─────→ Hard disqualifiers, outreach hooks from score breakdown       │
-│  Intent-Detection  ──→ Signal taxonomy (FDA/Trial/Patent/Hiring/Funding/NEWS)    │
-│    Agent (MIT)         + weighted scoring pipeline                                 │
-└──────────────────────────────────────────────────────────────────────────────────┘
-
-
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│  DEPLOYMENT (Docker Compose)                                                       │
-│                                                                                  │
-│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐                     │
-│  │  Frontend    │────▶│  API Server  │────▶│  Neo4j       │                     │
-│  │  :5173       │     │  :3001       │     │  :7687       │                     │
-│  │  Vite dev    │     │  Express     │     │  APOC + GDS  │                     │
-│  └──────────────┘     └──────────────┘     └──────────────┘                     │
-│                                                                                  │
-│  Env: NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, OPENAI_API_KEY,                    │
-│  GITHUB_TOKEN (opt), EPO_CONSUMER_KEY + EPO_CONSUMER_SECRET (opt)               │
-└──────────────────────────────────────────────────────────────────────────────────┘
-```
+**Team:**
+| Member | Role | Tasks |
+|--------|------|-------|
+| 🛠️ **Tobias** | Backend Pipeline | 1–16 (all backend infra, 12 adapters, scoring, pipeline) |
+| 🎨 **Reyyan** | Dashboard UI | 17–21 (home, Lead Explorer, Admin — TanStack) |
+| 📋 **Beyza** | Pipeline CRM | 22–24 (Neo4j model, API, kanban) |
+| 🤖 **Zeynep** | AI Layer | 25–28 (enrich, outreach, explain — services done + API routes) |
 
 ---
 
-## Implementation Plan (23 Tasks, 5 Phases)
+## LeadGraph — Siemens Healthineers Challenge
 
-> Full code for each task in [`docs/superpowers/plans/2026-06-05-leadgraph-comprehensive-plan.md`](docs/superpowers/plans/2026-06-05-leadgraph-comprehensive-plan.md)
->
-> **Team Legend:**
-> | Icon | Member | Role |
-> |------|--------|------|
-> | 🛠️ | **Tobias** | Backend Ingestion Pipeline |
-> | 🎨 | **Reyyan** | Lead Dashboard UI |
-> | 📋 | **Beyza** | Pipeline CRM |
-> | 🤖 | **Zeynep** | AI Outreach & Scoring |
-> | ✅ | Anyone | Verification |
+**Problem:** Siemens Healthineers produces biological intermediates (proteins, antibodies, latex particles, blockers) at Marburg but lacks a B2B sales structure to identify buyers.
 
-### Phase 1: Backend Ingestion + Scoring (🛠️ Tobias)
+**Solution:** Neo4j knowledge graph + AI lead scoring that discovers, ranks, and surfaces diagnostic companies developing new assays.
 
-| # | Check | Task | Owner | Files |
-|---|-------|------|-------|-------|
-| 1 | `[x]` | **queryRows helper** — add native-record Cypher helper to `neo4j.ts` for scorer | 🛠️ **Tobias** | `services/graph/neo4j.ts` |
-| 2 | `[x]` | **Types** — SourceAdapter interface, SourceConfig, scoring types (TierLevel, ScoreBreakdown, ScoredCompany) | 🛠️ **Tobias** | `services/graph/ingest/types.ts` |
-| 3 | `[x]` | **Ontology seed** — constraints, 7 applications, 10 Siemens products, 15 competitor companies, seed signals | 🛠️ **Tobias** | `services/graph/ingest/ontology.ts` |
-| 4 | `[x]` | **4 stub adapters** — Patent, Hiring, Conference, Funding (hardcoded records → LeadCandidate) | 🛠️ **Tobias** | `services/graph/ingest/adapters/*-stub.ts` |
-| 5 | `[x]` | **FDA adapter** — real `api.fda.gov/device/510k` with 8 product code filters, company extraction | 🛠️ **Tobias** | `services/graph/ingest/adapters/fda-510k.ts` |
-| 6 | `[x]` | **GitHub adapter** — real `api.github.com` keyword search, org detection, topic→application mapping | 🛠️ **Tobias** | `services/graph/ingest/adapters/github.ts` |
-| 7 | `[x]` | **SourceManager** — concurrent runner, pool=3, weight-sorted, dedup, Neo4j upsert | 🛠️ **Tobias** | `services/graph/ingest/orchestrator.ts` |
-| 8 | `[x]` | **Index + routes** — singleton SourceManager with all adapters, POST /ingest, GET /sources, job tracker | 🛠️ **Tobias** | `ingest/index.ts`, `routes/graph.ts` |
-| 9 | `[x]` | **CLI + Scoring** — `npm run ingest`, `npm run score`. Scorer computes signal (0-40) + product fit (0-30) + segment bonus (0-20) + recency (0-10) → HOT/WARM/COLD | 🛠️ **Tobias** | `scripts/ingest.ts`, `scoring/scorer.ts` |
-
-> **Delivers:** Neo4j populated with companies, signals, scores.
-
-### Phase 1.5: DACH Market Data Sources (🛠️ Tobias)
-
-| # | Check | Task | Owner | Files |
-|---|-------|------|-------|-------|
-| 10 | `[x]` | **ClinicalTrials adapter** — real `clinicaltrials.gov` API, CLINICAL_TRIAL signal, shared app area extraction | 🛠️ **Tobias** | `adapters/clinical-trials.ts` |
-| 11 | `[x]` | **OpenAlex adapter** — real `api.openalex.org` research publications, company-affiliated authors | 🛠️ **Tobias** | `adapters/openalex.ts` |
-| 12 | `[x]` | **DRKS adapter** — German Clinical Trials Register bulk JSON download, CLINICAL_TRIAL signal (weight 22) | 🛠️ **Tobias** | `adapters/drks.ts` |
-| 13 | `[x]` | **EPO OPS adapter** — European Patent Office OAuth2 API, DE patents by IPC codes, PATENT signal (weight 23) | 🛠️ **Tobias** | `adapters/epatent.ts` |
-| 14 | `[x]` | **MEDICA adapter** — exhibitor database via /vis/v1/ HTML scraping, CONFERENCE signal (weight 18) | 🛠️ **Tobias** | `adapters/medica.ts` |
-| 15 | `[x]` | **BMBF FÖKAT adapter** — CSV export of German funded research projects, FUNDING signal (weight 15) | 🛠️ **Tobias** | `adapters/foekat.ts` |
-| 16 | `[x]` | **Job tracker** — in-memory Map for async ingest job progress tracking | 🛠️ **Tobias** | `job-tracker.ts` |
-
-> **Delivers:** 12 adapters (8 real, 4 stubs). DACH-region coverage with DRKS, EPO, MEDICA, FÖKAT.
-
-### Phase 2: Dashboard UI (🎨 Reyyan — In Progress)
-
-| # | Check | Task | Owner | Files |
-|---|-------|------|-------|-------|
-| 17 | `[ ]` | **API hooks** — useIngest, useSeed, useScores, useSources in TanStack Query | 🎨 **Reyyan** | `client/src/lib/graph.ts` |
-| 18 | `[x]` | **Navigation** — add Leads, Pipeline, Admin links to RootLayout | 🎨 **Reyyan** | `client/src/routes/__root.tsx` |
-| 19 | `[~]` | **Dashboard home** — skeleton page with placeholder cards, links to Leads/Pipeline/Admin, no real summary data yet | 🎨 **Reyyan** | `client/src/routes/index.tsx` |
-| 20 | `[ ]` | **Lead Explorer** — score-sorted table with tier badges + score bars, search/filter, detail drawer with signals timeline + breakdown + outreach hook | 🎨 **Reyyan** | `client/src/routes/leads*.tsx` |
-| 21 | `[ ]` | **Admin panel** — per-source Run buttons, health status, scoring summary, Neo4j stats | 🎨 **Reyyan** | `client/src/routes/admin.tsx` |
-
-> **Status:** Nav links + dashboard skeleton exist. Hooks, real data, Leads page, and Admin page still needed.
-
-### Phase 3: Pipeline CRM (📋 Beyza — Implemented, type errors)
-
-| # | Check | Task | Owner | Files |
-|---|-------|------|-------|-------|
-| 22 | `[x]` | **Pipeline data model + API** — Contact/PipelineStage/Activity Cypher, POST start, PUT advance, PUT regress, GET leads, POST notes | 📋 **Beyza** | `services/graph/pipeline/`, `routes/pipeline.ts` |
-| 23 | `[x]` | **Pipeline React Query hooks** — usePipelineLeads, useAdvanceStage, useRegressStage, useAddActivity, useContactActivity | 📋 **Beyza** | `client/src/lib/pipeline.ts` |
-| 24 | `[x]` | **Pipeline kanban** — 6-column (New→Contacted→Meeting→Proposal→Closed Won→Closed Lost), advance/regress, activity timeline, add notes | 📋 **Beyza** | `client/src/routes/pipeline.tsx` |
-
-> **⚠️ Note:** Client kanban page has type errors (pipeline.tsx imports `useAddNote`/`PipelineStage`/`ActivityNote` that don't exist in hooks). Needs sync between hooks file and kanban component.
-
-### Phase 4: AI Layer (🤖 Zeynep — Services done, UI pending)
-
-| # | Check | Task | Owner | Files |
-|---|-------|------|-------|-------|
-| 25 | `[x]` | **AI enrichment** — LLM fills segment/domain/applications for companies | 🤖 **Zeynep** | `services/ai/enrich.ts` |
-| 26 | `[x]` | **AI outreach** — LLM generates personalized cold email from signals + products | 🤖 **Zeynep** | `services/ai/outreach.ts` |
-| 27 | `[x]` | **AI explainer + API** — LLM explains score breakdown, POST /enrich/:id, POST /outreach/:id, GET /explain/:id | 🤖 **Zeynep** | `services/ai/explain.ts`, `routes/ai.ts` |
-| 28 | `[ ]` | **AI UI** — "Enrich" / "Generate Email" / "Why this score?" buttons on lead detail drawer | 🤖 **Zeynep** | `client/src/routes/leads/$id.tsx` |
-
-> **Status:** All 3 AI services + API routes exist. UI buttons on lead detail drawer still needed (depends on Phase 2 Lead Explorer existing).
-
-### Phase 5: Verification (✅ All — not yet passing)
-
-| # | Check | Task | Owner | Details |
-|---|-------|------|-------|---------|
-| 29 | `[ ]` | **TypeScript + LSP** — `npm run typecheck` clean, no `lsp_diagnostics` errors on all new files | ✅ Anyone | **❌ Server:** 2 unused var errors (export-bootstrap.ts) + 2 shared package build dep errors. **❌ Client:** ~20 type errors (pipeline.tsx mismatched with hooks). |
-| 30 | `[ ]` | **Neo4j smoke test** — `docker compose up -d neo4j` → `npm run ingest:seed` → `npm run ingest` → `npm run score` → check API endpoints | ✅ Anyone | Full pipeline |
+See the full spec at [`docs/superpowers/specs/2026-06-05-leadgraph-ingestion-design.md`](docs/superpowers/specs/2026-06-05-leadgraph-ingestion-design.md)
 
 ---
 
-## Team Member Overview
+## Environment Variables
 
-| Member | Focus | Tasks | What They Build |
-|--------|-------|-------|-----------------|
-| 🛠️ **Tobias** | Ingestion Pipeline | 1–16 | Types, ontology, 12 data source adapters (8 real: FDA, GitHub, ClinicalTrials, OpenAlex, DRKS, EPO, MEDICA, FÖKAT + 4 stubs), concurrent SourceManager, job tracker, Neo4j upsert, scoring pipeline, CLI scripts, pipeline backend |
-| 🎨 **Reyyan** | Lead Dashboard UI | 17–21 | React pages: Dashboard home with summary cards, Lead Explorer table with filters + detail drawer, Admin panel with ingest controls. Uses TanStack Router/Query |
-| 📋 **Beyza** | Pipeline CRM | 22–24 | Neo4j pipeline data model (Contact/Stage/Activity), CRUD API, React kanban board with advance/regress, activity timeline, note-taking |
-| 🤖 **Zeynep** | AI Layer | 25–28 | AI services done: enrichment, outreach, explain — all wired to API routes. Missing: UI buttons on lead detail drawer |
-
-## Dependency Flow
-
-```
-                           ┌─────────────────────────────────────┐
-                           │ 🛠️ **Tobias**: Backend Pipeline           │
-                           │ Tasks 1-16: types → adapters (8     │
-                           │ real + 4 stubs) → SourceManager →   │
-                           │ seed → ingest → score → pipeline    │
-                           │                                      │
-                           │ OUTPUT: Neo4j full of companies,      │
-                           │ signals, scores, tiers, pipeline      │
-                           └─────────────────┬───────────────────┘
-                                             │
-                             ┌───────────────┼───────────────┐
-                             ▼               ▼               ▼
-                    ┌────────────────┐ ┌────────────┐ ┌──────────────┐
-                    │ 🎨 **Reyyan**    │ │ 📋 **Beyza**│ │ 🤖 **Zeynep**  │
-                    │ Lead Dashboard │ │ Pipeline   │ │ AI Layer     │
-                    │                │ │ CRM        │ │              │
-                    │ Tasks 17-21    │ │ Tasks 22-24│ │ Tasks 25-28  │
-                    │ Reads from     │ │ Extends &  │ │ Builds new   │
-                    │ Neo4j via API  │ │ enhances   │ │ services on  │
-                    │ (read-only)    │ │ existing   │ │ existing     │
-                    │                │ │ kanban +   │ │ graph data    │
-                    │                │ │ hooks      │ │              │
-                    └────────────────┘ └────────────┘ └──────────────┘
-```
-
-**All backend infrastructure is complete.** 🎨 **Reyyan** (Dashboard UI) and 🤖 **Zeynep** (AI layer) can work in parallel — Reyyan needs to build API hooks + routes, Zeynep needs backend AI services + frontend buttons. 📋 **Beyza** can skip ahead to enhancing the pipeline (add drag-and-drop, email notifications, etc.).
-
----
-
-## Extended API Endpoints
-
-| Method | Path | Description | Owner |
-|--------|------|-------------|-------|
-| POST | `/api/graph/seed` | Seed ontology + baseline companies | ✅ Done |
-| GET | `/api/graph/health` | Neo4j connectivity check | ✅ Done |
-| POST | `/api/graph/query` | Execute arbitrary Cypher | ✅ Done |
-| GET | `/api/graph/stats` | Graph node/relationship counts | ✅ Done |
-| POST | `/api/graph/ingest` | Run all ingestion adapters (or `?source=`) | ✅ Done |
-| POST | `/api/graph/ingest/status/:jobId` | Async ingest job progress | ✅ Done |
-| GET | `/api/graph/ingest/sources` | List registered adapters + health | ✅ Done |
-| DELETE | `/api/graph/ingest` | Truncate graph | ✅ Done |
-| GET | `/api/graph/score` | Score all prospects (HOT/WARM/COLD) | ✅ Done |
-| GET | `/api/pipeline/stages` | Pipeline stage definitions | ✅ Done |
-| GET | `/api/pipeline/leads` | All pipeline leads with current stage | ✅ Done |
-| POST | `/api/pipeline/start` | Start pipeline tracking for a lead | ✅ Done |
-| PUT | `/api/pipeline/:id/advance` | Advance to next pipeline stage | ✅ Done |
-| PUT | `/api/pipeline/:id/regress` | Move to any previous stage | ✅ Done |
-| POST | `/api/pipeline/:id/activity` | Add activity note | ✅ Done |
-| GET | `/api/pipeline/:id/activity` | Get activity history | ✅ Done |
-| POST | `/api/ai/enrich/:companyId` | AI-enrich company data (segment, domain) | ✅ Done |
-| POST | `/api/ai/outreach/:companyId` | Generate personalized outreach email | ✅ Done |
-| GET | `/api/ai/explain/:companyId` | AI justification of score breakdown | ✅ Done |
-| POST | `/api/ai/ask` | General AI chat with graph context | ✅ Done |
-| POST | `/api/agents/preferences/validate` | Validate preference confirmation token | ❌ Not built |
-| POST | `/api/agents/preferences/submit` | Submit customer communication preferences | ❌ Not built |
+| Variable | Required | Default |
+|----------|----------|---------|
+| `NEO4J_URI` | No | `bolt://localhost:7687` |
+| `NEO4J_USER` | No | `neo4j` |
+| `NEO4J_PASSWORD` | No | `password` |
+| `OPENAI_API_KEY` | For AI features | — |
+| `GITHUB_TOKEN` | For GitHub adapter | — (works with lower rate limit) |
+| `EPO_CONSUMER_KEY` | For EPO OPS adapter | — |
+| `EPO_CONSUMER_SECRET` | For EPO OPS adapter | — |
