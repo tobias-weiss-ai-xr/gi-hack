@@ -20,11 +20,6 @@ const NEO4J_URI = process.env.NEO4J_URI ?? "bolt://localhost:7687";
 const NEO4J_USER = process.env.NEO4J_USER ?? "neo4j";
 const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD ?? "password";
 
-interface CypherStatement {
-  text: string;
-  params: Record<string, unknown>;
-}
-
 async function main() {
   console.log(`Connecting to ${NEO4J_URI}...`);
   createDriver({ uri: NEO4J_URI, user: NEO4J_USER, password: NEO4J_PASSWORD });
@@ -227,7 +222,6 @@ async function main() {
       const email = esc(ct.email ?? "");
       const role = esc(ct.role ?? "");
       // Create contact with a deterministic UUID based on name
-      const contactId = `contact-${ct.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
       lines.push(
         `MERGE (ct:Contact {name: ${name}}) ` +
         `ON CREATE SET ct.email = ${email}, ct.role = ${role} ` +

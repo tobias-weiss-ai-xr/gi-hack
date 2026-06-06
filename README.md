@@ -493,19 +493,19 @@ See the full spec at [`docs/superpowers/specs/2026-06-05-leadgraph-ingestion-des
 
 > **Delivers:** 12 adapters (8 real, 4 stubs). DACH-region coverage with DRKS, EPO, MEDICA, FÖKAT.
 
-### Phase 2: Dashboard UI (🎨 Reyyan)
+### Phase 2: Dashboard UI (🎨 Reyyan — In Progress)
 
 | # | Check | Task | Owner | Files |
 |---|-------|------|-------|-------|
 | 17 | `[ ]` | **API hooks** — useIngest, useSeed, useScores, useSources in TanStack Query | 🎨 **Reyyan** | `client/src/lib/graph.ts` |
-| 18 | `[ ]` | **Navigation** — add Leads, Pipeline, Admin links to RootLayout | 🎨 **Reyyan** | `client/src/routes/__root.tsx` |
-| 19 | `[ ]` | **Dashboard home** — 4 summary cards, Top 5 leads, Quick Actions (Seed/Ingest buttons) | 🎨 **Reyyan** | `client/src/routes/index.tsx` |
+| 18 | `[x]` | **Navigation** — add Leads, Pipeline, Admin links to RootLayout | 🎨 **Reyyan** | `client/src/routes/__root.tsx` |
+| 19 | `[~]` | **Dashboard home** — skeleton page with placeholder cards, links to Leads/Pipeline/Admin, no real summary data yet | 🎨 **Reyyan** | `client/src/routes/index.tsx` |
 | 20 | `[ ]` | **Lead Explorer** — score-sorted table with tier badges + score bars, search/filter, detail drawer with signals timeline + breakdown + outreach hook | 🎨 **Reyyan** | `client/src/routes/leads*.tsx` |
 | 21 | `[ ]` | **Admin panel** — per-source Run buttons, health status, scoring summary, Neo4j stats | 🎨 **Reyyan** | `client/src/routes/admin.tsx` |
 
-> **Depends on:** Phase 1 (for data), but buildable with mock data. **Delivers:** Full UI to browse/explore scored leads.
+> **Status:** Nav links + dashboard skeleton exist. Hooks, real data, Leads page, and Admin page still needed.
 
-### Phase 3: Pipeline CRM (📋 Beyza — Implemented)
+### Phase 3: Pipeline CRM (📋 Beyza — Implemented, type errors)
 
 | # | Check | Task | Owner | Files |
 |---|-------|------|-------|-------|
@@ -513,24 +513,24 @@ See the full spec at [`docs/superpowers/specs/2026-06-05-leadgraph-ingestion-des
 | 23 | `[x]` | **Pipeline React Query hooks** — usePipelineLeads, useAdvanceStage, useRegressStage, useAddActivity, useContactActivity | 📋 **Beyza** | `client/src/lib/pipeline.ts` |
 | 24 | `[x]` | **Pipeline kanban** — 6-column (New→Contacted→Meeting→Proposal→Closed Won→Closed Lost), advance/regress, activity timeline, add notes | 📋 **Beyza** | `client/src/routes/pipeline.tsx` |
 
-> **Delivers:** Real Neo4j-backed pipeline with kanban UI, activity tracking, stage transitions.
+> **⚠️ Note:** Client kanban page has type errors (pipeline.tsx imports `useAddNote`/`PipelineStage`/`ActivityNote` that don't exist in hooks). Needs sync between hooks file and kanban component.
 
-### Phase 4: AI Layer (🤖 Zeynep)
+### Phase 4: AI Layer (🤖 Zeynep — Services done, UI pending)
 
 | # | Check | Task | Owner | Files |
 |---|-------|------|-------|-------|
-| 25 | `[ ]` | **AI enrichment** — LLM fills segment/domain/applications for companies | 🤖 **Zeynep** | `services/ai/enrich.ts` |
-| 26 | `[ ]` | **AI outreach** — LLM generates personalized cold email from signals + products | 🤖 **Zeynep** | `services/ai/outreach.ts` |
-| 27 | `[ ]` | **AI explainer + API** — LLM explains score breakdown, POST /enrich/:id, POST /outreach/:id, GET /explain/:id | 🤖 **Zeynep** | `services/ai/explain.ts`, `routes/ai.ts` |
+| 25 | `[x]` | **AI enrichment** — LLM fills segment/domain/applications for companies | 🤖 **Zeynep** | `services/ai/enrich.ts` |
+| 26 | `[x]` | **AI outreach** — LLM generates personalized cold email from signals + products | 🤖 **Zeynep** | `services/ai/outreach.ts` |
+| 27 | `[x]` | **AI explainer + API** — LLM explains score breakdown, POST /enrich/:id, POST /outreach/:id, GET /explain/:id | 🤖 **Zeynep** | `services/ai/explain.ts`, `routes/ai.ts` |
 | 28 | `[ ]` | **AI UI** — "Enrich" / "Generate Email" / "Why this score?" buttons on lead detail drawer | 🤖 **Zeynep** | `client/src/routes/leads/$id.tsx` |
 
-> **Depends on:** Phase 2 (for detail drawer). **Delivers:** AI-powered enrichment, outreach emails, score explanations.
+> **Status:** All 3 AI services + API routes exist. UI buttons on lead detail drawer still needed (depends on Phase 2 Lead Explorer existing).
 
-### Phase 5: Verification (✅ All)
+### Phase 5: Verification (✅ All — not yet passing)
 
 | # | Check | Task | Owner | Details |
 |---|-------|------|-------|---------|
-| 29 | `[ ]` | **TypeScript + LSP** — `npm run typecheck` clean, no `lsp_diagnostics` errors on all new files | ✅ Anyone | All changed files |
+| 29 | `[ ]` | **TypeScript + LSP** — `npm run typecheck` clean, no `lsp_diagnostics` errors on all new files | ✅ Anyone | **❌ Server:** 2 unused var errors (export-bootstrap.ts) + 2 shared package build dep errors. **❌ Client:** ~20 type errors (pipeline.tsx mismatched with hooks). |
 | 30 | `[ ]` | **Neo4j smoke test** — `docker compose up -d neo4j` → `npm run ingest:seed` → `npm run ingest` → `npm run score` → check API endpoints | ✅ Anyone | Full pipeline |
 
 ---
@@ -542,7 +542,7 @@ See the full spec at [`docs/superpowers/specs/2026-06-05-leadgraph-ingestion-des
 | 🛠️ **Tobias** | Ingestion Pipeline | 1–16 | Types, ontology, 12 data source adapters (8 real: FDA, GitHub, ClinicalTrials, OpenAlex, DRKS, EPO, MEDICA, FÖKAT + 4 stubs), concurrent SourceManager, job tracker, Neo4j upsert, scoring pipeline, CLI scripts, pipeline backend |
 | 🎨 **Reyyan** | Lead Dashboard UI | 17–21 | React pages: Dashboard home with summary cards, Lead Explorer table with filters + detail drawer, Admin panel with ingest controls. Uses TanStack Router/Query |
 | 📋 **Beyza** | Pipeline CRM | 22–24 | Neo4j pipeline data model (Contact/Stage/Activity), CRUD API, React kanban board with advance/regress, activity timeline, note-taking |
-| 🤖 **Zeynep** | AI Layer | 25–28 | Company enrichment (LLM fills missing data), personalized outreach email generator, score explainer, UI integration with buttons on lead detail drawer |
+| 🤖 **Zeynep** | AI Layer | 25–28 | AI services done: enrichment, outreach, explain — all wired to API routes. Missing: UI buttons on lead detail drawer |
 
 ## Dependency Flow
 
@@ -596,9 +596,9 @@ See the full spec at [`docs/superpowers/specs/2026-06-05-leadgraph-ingestion-des
 | PUT | `/api/pipeline/:id/regress` | Move to any previous stage | ✅ Done |
 | POST | `/api/pipeline/:id/activity` | Add activity note | ✅ Done |
 | GET | `/api/pipeline/:id/activity` | Get activity history | ✅ Done |
-| POST | `/api/ai/enrich/:companyId` | AI-enrich company data (segment, domain) | 🤖 Zeynep |
-| POST | `/api/ai/outreach/:companyId` | Generate personalized outreach email | 🤖 Zeynep |
-| GET | `/api/ai/explain/:companyId` | AI justification of score breakdown | 🤖 Zeynep |
+| POST | `/api/ai/enrich/:companyId` | AI-enrich company data (segment, domain) | ✅ Done |
+| POST | `/api/ai/outreach/:companyId` | Generate personalized outreach email | ✅ Done |
+| GET | `/api/ai/explain/:companyId` | AI justification of score breakdown | ✅ Done |
 | POST | `/api/ai/ask` | General AI chat with graph context | ✅ Done |
 | POST | `/api/agents/preferences/validate` | Validate preference confirmation token | ❌ Not built |
 | POST | `/api/agents/preferences/submit` | Submit customer communication preferences | ❌ Not built |
