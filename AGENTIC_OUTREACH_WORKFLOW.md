@@ -29,6 +29,41 @@ Add to Pipeline (Contacted Stage)
 
 ## Components
 
+### 0. Contact Finder Service
+
+**File:** `packages/server/src/services/agents/contactFinder.ts`
+
+**Responsibility:** Discovers contact persons and email addresses for qualified leads before AI outreach.
+
+**Strategy Chain (pluggable, LLM → web scrape → LinkedIn → pattern):**
+
+| Priority | Strategy | File | Method | Returns |
+|----------|----------|------|--------|---------|
+| 1 | **LLM suggestion** | `LLMContactStrategy` | Uses OpenAI to suggest realistic contacts from company profile (name, domain, segment, tier, signals) | 2–4 contacts with name, role, email, confidence |
+| 2 | **Web scraping** | `WebScrapeStrategy` | Fetches company homepage, extracts email addresses via regex, finds team/about/contact page links | Real emails from the website |
+| 3 | **LinkedIn** | `LinkedInStrategy` | Placeholder — would use Proxycurl API or Playwright scrape of company LinkedIn page → people tab | Names + roles (not yet implemented) |
+| 4 | **Email patterns** | `PatternEmailStrategy` | Generates email from common patterns (`first.last@domain`, `f.last@domain`) | Best-guess emails, low confidence |
+
+**Interface:**
+```typescript
+interface ContactFinderStrategy {
+  name: string;
+  find(input: ContactFinderInput): Promise<ContactCandidate[]>;
+}
+
+// Usage
+const finder = new ContactFinder();
+finder.use(new HunterIOStrategy()); // pluggable
+const result = await finder.findContacts({ companyName, domain, signals });
+```
+
+**Scoring:** Each contact has a `confidence` score (0–1). Results are deduplicated by email and sorted by confidence descending. The chain stops at the first strategy that returns results (LLM is sufficient).
+
+**TODO — Additional strategies to implement:**
+- **Hunter.io** — Best real-email source, API: `https://api.hunter.io/v2/domain-search?domain=X&api_key=Y`
+- **Proxycurl** — LinkedIn people API for company employees
+- **Google dorking** — `site:linkedin.com/in "CompanyName" "R&D"` for public profile discovery
+
 ### 1. Lead Qualifier Agent
 
 **File:** `packages/server/src/services/agents/leadQualifier.ts`
@@ -237,6 +272,13 @@ async function runOutreachBatch() {
 ---
 
 ## API Endpoints
+
+### Contact Discovery
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/agents/find-contacts` | Find contacts for a company by name. Body: `{ companyName }` |
+| POST | `/api/agents/outreach/run` | Full batch: qualify → find contacts → generate email (admin) |
 
 ### Outreach Management
 

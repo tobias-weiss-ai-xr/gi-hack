@@ -2,6 +2,29 @@
 
 A ready-to-hack boilerplate for the **StartMiUp Hackathon – AI for Mittelhessen**.
 
+## 🏗️ Pipeline MVP — Demo
+
+This branch (`feature/pipeline-mvp`) builds on the boilerplate with a demo-ready Pipeline CRM and an agentic outreach workflow:
+
+**Pipeline CRM:** A 6-stage Kanban board (New → Contacted → Meeting → Proposal → Closed Won/Lost) with 10 demo leads, 57 activity entries, and realistic DACH IVD contacts — all generated idempotently via `npm run demo:pipeline`.
+
+**Agentic Outreach Workflow** (design spec in `AGENTIC_OUTREACH_WORKFLOW.md`):
+- **Lead Qualifier** — scores/scans for HOT/WARM leads without existing contacts
+- **Company Profile Builder** — extracts signals, product fit, application overlap
+- **Outreach Email Generator** — AI-personalized cold emails from company profile
+- **Preference Confirmation** — GDPR-compliant landing page where customer confirms their own data (consent, contact method, interest areas, timeline)
+- **Outreach Orchestrator** — coordinates the full pipeline
+
+**Demo Script:**
+```bash
+npm run demo:pipeline
+# Generates 10 leads across all 6 pipeline stages with realistic stories
+```
+
+**Preference Page:** `packages/client/src/routes/preferences.lazy.tsx` — standalone form with consent checkbox, contact method selector (Email/Call/Both), interest areas, timeline, and notes. Requires route registration + backend endpoints for full flow.
+
+**Dashboard fixes:** All frontend API hooks (`useScores`, `useGraphStats`, `useGraphHealth`, `useSources`) were fixed to properly unwrap the `{ok, data}` response envelope — home page and leads page no longer crash.
+
 ## What's Inside
 
 | Layer | Technology |
@@ -575,3 +598,5 @@ See the full spec at [`docs/superpowers/specs/2026-06-05-leadgraph-ingestion-des
 | POST | `/api/ai/outreach/:companyId` | Generate personalized outreach email | 🤖 Zeynep |
 | GET | `/api/ai/explain/:companyId` | AI justification of score breakdown | 🤖 Zeynep |
 | POST | `/api/ai/ask` | General AI chat with graph context | ✅ Done |
+| POST | `/api/agents/preferences/validate` | Validate preference confirmation token | ❌ Not built |
+| POST | `/api/agents/preferences/submit` | Submit customer communication preferences | ❌ Not built |

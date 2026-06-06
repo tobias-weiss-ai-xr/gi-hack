@@ -89,36 +89,48 @@ async function postJson<T>(path: string, body?: unknown): Promise<T> {
 
 /** Fetches all scored companies (HOT/WARM/COLD). */
 export function useScores() {
-  return useQuery({
+  return useQuery<ScoredCompany[]>({
     queryKey: queryKeys.scores,
-    queryFn: () => fetchJson<ScoredCompany[]>("/graph/score"),
-    staleTime: 1000 * 60 * 2, // Cache for 2 minutes
+    queryFn: async () => {
+      const res = await fetchJson<{ data: { companies: ScoredCompany[] } }>("/graph/score");
+      return res.data.companies;
+    },
+    staleTime: 1000 * 60 * 2,
   });
 }
 
 /** Returns the list of registered source adapters. */
 export function useSources() {
-  return useQuery({
+  return useQuery<SourceInfo[]>({
     queryKey: queryKeys.sources,
-    queryFn: () => fetchJson<SourceInfo[]>("/graph/ingest/sources"),
+    queryFn: async () => {
+      const res = await fetchJson<{ data: { sources: SourceInfo[] } }>("/graph/ingest/sources");
+      return res.data.sources;
+    },
     staleTime: 1000 * 30,
   });
 }
 
 /** Checks the health status of the Neo4j graph. */
 export function useGraphHealth() {
-  return useQuery({
+  return useQuery<{ status: string; message?: string }>({
     queryKey: queryKeys.health,
-    queryFn: () => fetchJson<{ status: string; message?: string }>("/graph/health"),
+    queryFn: async () => {
+      const res = await fetchJson<{ data: { connected: boolean } }>("/graph/health");
+      return { status: res.data.connected ? "ok" : "error" };
+    },
     refetchInterval: 1000 * 30,
   });
 }
 
 /** Retrieves Neo4j graph statistics. */
 export function useGraphStats() {
-  return useQuery({
+  return useQuery<GraphStats>({
     queryKey: queryKeys.graphStats,
-    queryFn: () => fetchJson<GraphStats>("/graph/stats"),
+    queryFn: async () => {
+      const res = await fetchJson<{ data: GraphStats }>("/graph/stats");
+      return res.data;
+    },
     staleTime: 1000 * 60,
   });
 }
