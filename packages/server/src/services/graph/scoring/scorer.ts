@@ -11,6 +11,7 @@ const SEGMENT_BONUS: Record<string, number> = {
 const SIGNAL_WEIGHTS: Record<string, number> = {
   FDA_CLEARANCE: 40,
   CLINICAL_TRIAL: 30,
+  RESEARCH_PUBLICATION: 15,
   PATENT: 25,
   HIRING: 20,
   FUNDING: 15,
@@ -132,7 +133,6 @@ export async function scoreAll(): Promise<ScoredResult[]> {
     const validSignals = (row.signals ?? []) as SignalRow[];
 
     if (validSignals.length === 0) disqualifiers.push("No signals detected — insufficient data");
-    if (!row.domain) disqualifiers.push("No domain/website — hard to qualify");
     if (row.segment === "RESEARCH") disqualifiers.push("Research segment — unlikely B2B buyer");
 
     let signalScore = 0;
@@ -163,11 +163,11 @@ export async function scoreAll(): Promise<ScoredResult[]> {
     );
 
     let tier: "HOT" | "WARM" | "COLD";
-    if (totalScore >= 70) tier = "HOT";
-    else if (totalScore >= 40) tier = "WARM";
+    if (totalScore >= 60) tier = "HOT";
+    else if (totalScore >= 30) tier = "WARM";
     else tier = "COLD";
 
-    const outreachHook = disqualifiers.length === 0 && totalScore >= 40 ? generateHook(validSignals) : undefined;
+    const outreachHook = disqualifiers.length === 0 && totalScore >= 30 ? generateHook(validSignals) : undefined;
 
     scored.push({
       companyName: row.name,
