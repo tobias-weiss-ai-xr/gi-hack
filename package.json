@@ -12,7 +12,8 @@
     "typecheck": "npm run typecheck --workspaces",
     "lint": "npm run lint --workspaces",
     "db:export": "npm -w packages/server run db:export",
-    "db:bootstrap": "npm -w packages/server run db:bootstrap"
+    "db:bootstrap": "npm -w packages/server run db:bootstrap",
+    "demo:pipeline": "ts-node packages/server/src/scripts/create-demo-pipeline.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

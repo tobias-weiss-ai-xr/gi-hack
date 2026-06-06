@@ -100,11 +100,11 @@ router.get("/stats", async (_req: Request, res: Response) => {
     res.json({
       ok: true,
       data: {
-        companies: Number(companies.records?.[0]?.get("count") ?? 0),
-        products: Number(products.records?.[0]?.get("count") ?? 0),
-        applications: Number(applications.records?.[0]?.get("count") ?? 0),
-        signals: Number(signals.records?.[0]?.get("count") ?? 0),
-        totalRelationships: Number(relationships.records?.[0]?.get("count") ?? 0),
+        companies: Number(companies.records?.[0]?.count ?? 0),
+        products: Number(products.records?.[0]?.count ?? 0),
+        applications: Number(applications.records?.[0]?.count ?? 0),
+        signals: Number(signals.records?.[0]?.count ?? 0),
+        totalRelationships: Number(relationships.records?.[0]?.count ?? 0),
       },
     });
   } catch (err) {
