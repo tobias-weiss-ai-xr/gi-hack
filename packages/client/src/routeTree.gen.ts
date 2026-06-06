@@ -5,6 +5,7 @@ import { AdminPage } from "./routes/admin";
 import { LeadsPage } from "./routes/leads";
 import { GraphPage } from "./routes/graph.lazy";
 import { ChatPage } from "./routes/chat.lazy";
+import { PipelinePage } from "./routes/pipeline.lazy";
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -40,7 +41,13 @@ const chatRoute = createRoute({
   component: ChatPage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, adminRoute, leadsRoute, graphRoute, chatRoute]);
+const pipelineRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/pipeline",
+  component: PipelinePage,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, adminRoute, leadsRoute, graphRoute, chatRoute, pipelineRoute]);
 
 export const router = createRouter({ routeTree });
 
