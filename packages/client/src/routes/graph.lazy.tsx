@@ -19,7 +19,7 @@ interface GraphEdge {
 }
 
 export function GraphPage() {
-  const [cypher, setCypher] = useState("MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 50");
+  const [cypher, setCypher] = useState("MATCH (c:Company)-[:HAS_SIGNAL]->(s:Signal) RETURN c, s LIMIT 30");
   const query = useGraphQuery();
   const seed = useGraphSeed();
   const [graphData, setGraphData] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
@@ -149,7 +149,7 @@ export function GraphPage() {
             color: "#ccc",
             outline: "none",
           }}
-          placeholder="MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 50"
+          placeholder="MATCH (c:Company)-[:HAS_SIGNAL]->(s:Signal) RETURN c, s LIMIT 30"
           onKeyDown={(e) => { if (e.key === "Enter") query.mutate(cypher); }}
         />
         <button
