@@ -40,11 +40,11 @@ function getLabelConfig(labels: string[]) {
 
 export function GraphPage() {
   const PRESET_QUERIES = [
-    { label: "Companies + Signals", query: "MATCH (c:Company)-[:HAS_SIGNAL]->(s:Signal) RETURN c, s LIMIT 30" },
-    { label: "Companies + Products + Applications", query: "MATCH (c:Company)-[:SUPPLIES]->(p:Product), (c)-[:DEVELOPS]->(a:Application) RETURN c, p, a LIMIT 30" },
-    { label: "Pipeline CRM", query: "MATCH (c:Company)<-[:CONTACT_AT]-(contact:Contact)-[:IN_STAGE]->(stage:PipelineStage) RETURN c, contact, stage LIMIT 30" },
-    { label: "Contact Activity Trail", query: "MATCH (c:Company)<-[:CONTACT_AT]-(contact:Contact)-[:HAS_ACTIVITY]->(a:Activity) RETURN c, contact, a LIMIT 30" },
-    { label: "Everything (slow)", query: "MATCH (n) OPTIONAL MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 60" },
+    { label: "Signal-Rich Leads", query: "MATCH (c:Company)-[:HAS_SIGNAL]->(s:Signal) RETURN c, s LIMIT 40" },
+    { label: "IVD Lead Landscape", query: "MATCH (c:Company {segment: 'IVD'})-[:HAS_SIGNAL]->(s:Signal) RETURN c, s LIMIT 40" },
+    { label: "Pipeline + Activities", query: "MATCH (c:Company)<-[:CONTACT_AT]-(contact:Contact)-[:IN_STAGE]->(s:PipelineStage), (contact)-[:HAS_ACTIVITY]->(a:Activity) RETURN c, contact, s, a LIMIT 40" },
+    { label: "Lead Products", query: "MATCH (c:Company)-[:SUPPLIES]->(p:Product) RETURN c, p LIMIT 25" },
+    { label: "Signal + Applications", query: "MATCH (c:Company)-[:HAS_SIGNAL]->(s:Signal) OPTIONAL MATCH (c)-[:DEVELOPS]->(a:Application) RETURN c, s, a LIMIT 50" },
   ];
 
   const defaultQuery = PRESET_QUERIES[0].query;
