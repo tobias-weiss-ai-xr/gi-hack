@@ -315,7 +315,6 @@ export class ContactFinder {
   private strategies: ContactFinderStrategy[];
 
   constructor(strategies?: ContactFinderStrategy[]) {
-    // LLM → web scrape → LinkedIn (placeholder) → pattern (last resort)
     this.strategies = strategies ?? [
       new LLMContactStrategy(),
       new WebScrapeStrategy(),
