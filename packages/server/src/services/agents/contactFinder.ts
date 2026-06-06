@@ -1,6 +1,3 @@
-import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ContactCandidate {
@@ -8,7 +5,7 @@ export interface ContactCandidate {
   role: string;
   email: string | null;
   confidence: number; // 0–1
-  source: "llm" | "scrape" | "pattern" | "api";
+  source: "llm" | "scrape" | "pattern" | "linkedin" | "api";
 }
 
 export interface ContactFinderInput {
@@ -37,47 +34,54 @@ export interface ContactFinderStrategy {
 
 export class LLMContactStrategy implements ContactFinderStrategy {
   name = "llm";
+  private endpoint: string;
+  private model: string;
+
+  constructor() {
+    this.endpoint = process.env.LLM_ENDPOINT || "http://localhost:11434/v1/chat/completions";
+    this.model = process.env.LLM_MODEL || "llama3";
+  }
 
   async find(input: ContactFinderInput): Promise<ContactCandidate[]> {
-    const systemPrompt = `
-You are a B2B sales intelligence agent for Siemens Healthineers Marburg.
-Your task is to suggest realistic R&D and procurement contacts for a target diagnostics company.
-
-Given the company profile below, return a JSON array of likely contacts.
-Only include roles that typically exist in a diagnostics/IVD/biotech company.
-
-For each contact, provide:
-- name: A realistic full name (first + last) appropriate for the company's country/region
-- role: A specific job title (e.g. "Head of Assay Development", "VP of R&D", "Director of Procurement")
-- email: Generate the most likely email address using common corporate patterns (firstname.lastname@domain, f.lastname@domain, etc.)
-- confidence: A score 0–1 based on how likely this specific role exists at a company of this size
-
-Rules:
-- Prefer R&D leadership: Head of R&D, Director of Assay Development, VP of Diagnostics
-- Include procurement if the company is large enough (Pharma, CDMO)
-- 2–4 contacts max
-- Return ONLY valid JSON array, no markdown, no extra text.
-
-Schema:
-[{"name": "string", "role": "string", "email": "string|null", "confidence": 0.0}]
-`;
-
     const signalSummary = input.signals.slice(0, 5).join("; ") || "No signals available";
 
+    const messages = [
+      {
+        role: "system",
+        content: `You are a B2B sales intelligence agent. Given a company profile, suggest realistic R&D and procurement contacts.
+
+Return a JSON array of contacts. Each contact has: name (full name), role (specific title), email (corporate pattern), confidence (0-1). Rules: 2-4 contacts max, prefer R&D leadership, include procurement for large companies. Return ONLY valid JSON array, no markdown.`,
+      },
+      {
+        role: "user",
+        content: [
+          `Company: ${input.companyName}`,
+          `Domain: ${input.domain}`,
+          `Segment: ${input.segment ?? "Unknown"}`,
+          `Tier: ${input.tier ?? "Unknown"}`,
+          `Applications: ${(input.applications ?? []).join(", ") || "Unknown"}`,
+          `Key signals: ${signalSummary}`,
+        ].join("\n"),
+      },
+    ];
+
     try {
-      const { text } = await generateText({
-        model: openai("gpt-4o"),
-        system: systemPrompt,
-        prompt: `
-Company: ${input.companyName}
-Domain: ${input.domain}
-Segment: ${input.segment ?? "Unknown"}
-Tier: ${input.tier ?? "Unknown"}
-Applications: ${(input.applications ?? []).join(", ") || "Unknown"}
-Key signals: ${signalSummary}
-        `.trim(),
-        temperature: 0.2,
+      const resp = await fetch(this.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: this.model,
+          messages,
+          temperature: 0.2,
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(15000),
       });
+
+      if (!resp.ok) return [];
+
+      const body = await resp.json() as any;
+      const text = body.choices?.[0]?.message?.content || "";
 
       const parsed = JSON.parse(text.trim());
       if (!Array.isArray(parsed)) return [];
@@ -107,10 +111,94 @@ Key signals: ${signalSummary}
 export class LinkedInStrategy implements ContactFinderStrategy {
   name = "linkedin";
 
-  async find(_input: ContactFinderInput): Promise<ContactCandidate[]> {
-    // Placeholder — returns empty, allowing chain to continue
-    return [];
+  async find(input: ContactFinderInput): Promise<ContactCandidate[]> {
+    try {
+      const { chromium } = await import("playwright");
+      const browser = await chromium.launch({ headless: true });
+      const context = await browser.newContext({ userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36" });
+      const page = await context.newPage();
+
+      const results: ContactCandidate[] = [];
+      try {
+        const query = `site:linkedin.com/in/ "${input.companyName}"`;
+        await page.goto(`https://www.google.com/search?q=${encodeURIComponent(query)}`, { waitUntil: "networkidle", timeout: 10000 });
+
+        const snippets = await page.$$eval("div.g", (divs) =>
+          divs.map((d) => {
+            const title = d.querySelector("h3")?.textContent ?? "";
+            const snippet = d.querySelector(".VwiC3b")?.textContent ?? "";
+            const link = d.querySelector("a")?.href ?? "";
+            return { title, snippet, link };
+          }),
+        );
+
+        for (const s of snippets) {
+          const title = s.title.replace(/ - LinkedIn$/, "").trim();
+          const parts = title.split(" - ");
+          if (parts.length < 2) continue;
+          const name = parts[0].trim();
+          const role = parts[1].trim();
+          if (!name || name.length < 3) continue;
+
+          const email = generateEmailFromName(name, input.domain);
+          results.push({
+            name,
+            role,
+            email,
+            confidence: email ? 0.6 : 0.4,
+            source: "linkedin",
+          });
+        }
+
+        // Second search: look for broader LinkedIn pages mentioning the company
+        if (results.length < 3) {
+          const broadQuery = `"${input.companyName}" linkedin "people also viewed" OR "similar pages"`;
+          await page.goto(`https://www.google.com/search?q=${encodeURIComponent(broadQuery)}&start=10`, { waitUntil: "networkidle", timeout: 10000 });
+
+          const extraSnippets = await page.$$eval("div.g", (divs) =>
+            divs.map((d) => {
+              const title = d.querySelector("h3")?.textContent ?? "";
+              const snippet = d.querySelector(".VwiC3b")?.textContent ?? "";
+              return { title, snippet };
+            }),
+          );
+
+          for (const s of extraSnippets) {
+            const clean = s.title.replace(/ - LinkedIn$/, "").trim();
+            const parts = clean.split(" - ");
+            if (parts.length < 2) continue;
+            const name = parts[0].trim();
+            const role = parts[1].trim();
+            if (!name || name.length < 3) continue;
+            if (results.some((r) => r.name === name)) continue;
+
+            const email = generateEmailFromName(name, input.domain);
+            results.push({
+              name,
+              role,
+              email,
+              confidence: email ? 0.5 : 0.35,
+              source: "linkedin",
+            });
+          }
+        }
+      } catch {
+        // Search failure — return what we have
+      } finally {
+        await browser.close().catch(() => {});
+      }
+
+      return results;
+    } catch {
+      return [];
+    }
   }
+}
+
+function generateEmailFromName(name: string, domain: string): string | null {
+  const parts = name.toLowerCase().replace(/[^a-z\s-]/g, "").split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return null;
+  return `${parts[0]}.${parts[parts.length - 1]}@${domain}`;
 }
 
 // ─── Strategy 3: Web scraping with Playwright (fallback 1) ────────────────────
