@@ -1,5 +1,7 @@
 # Gi-Hack — AI Graph TanStack Boilerplate
 
+![LeadGraph Teaser](docs/teaser.png)
+
 A ready-to-hack boilerplate for the **StartMiUp Hackathon – AI for Mittelhessen**.
 
 | Layer | Technology |
@@ -172,10 +174,10 @@ Scoring algorithm: [`docs/superpowers/specs/2026-06-05-leadgraph-ingestion-desig
 |-------|------|-----|--------|
 | **1** | Backend: ingest pipeline, scoring, 4 stubs + 4 real adapters | 🛠️ Tobias | ✅ Done |
 | **1.5** | DACH sources: DRKS, EPO OPS, MEDICA, FÖKAT + ClinicalTrials, OpenAlex | 🛠️ Tobias | ✅ Done |
-| **2** | Dashboard: API hooks, home page, Lead Explorer, Admin panel | 🎨 Reyyan | 🔶 In progress (skeleton exists) |
+| **2** | Dashboard: API hooks ✅, Nav ✅, Lead Explorer ✅, Admin ✅, HomePage ❌, LeadDetail ❌ | 🎨 Reyyan | ⏳ Partial (4/6 done) |
 | **3** | Pipeline CRM: data model, API, kanban, hooks | 📋 Beyza | ✅ Done |
-| **4** | AI layer: enrichment, outreach, explain | 🤖 Zeynep | ✅ Services done, ⏳ UI pending |
-| **5** | Verification: typecheck, smoke test | ✅ All | ❌ See below |
+| **4** | AI layer: enrichment, outreach, explain services & routes ✅, UI ❌ | 🤖 Zeynep | ⏳ Services done, UI pending |
+| **5** | Verification: typecheck ❌, smoke test ❌ | ✅ All | ❌ TS errors |
 
 **Known gaps:**
 - Client typecheck: pipeline.tsx imports don't match hooks file (~20 errors)
