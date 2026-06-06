@@ -1,6 +1,6 @@
 import { useParams } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import { apiPost } from '../lib/api';
+import { apiPost, apiPut } from '../lib/api';
 
 export function PreferenceFormPage() {
   const params = useParams({ from: "/preferences/$contactId/$token" });
@@ -9,9 +9,13 @@ export function PreferenceFormPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [tokenValid, setTokenValid] = useState(false);
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [companyName, setCompanyName] = useState('');
 
   const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    role: '',
     consentGiven: false,
     preferredContactMethod: 'email' as 'email' | 'call' | 'both',
     interestLevel: 'medium' as 'high' | 'medium' | 'scheduling_only',
@@ -19,6 +23,8 @@ export function PreferenceFormPage() {
     timeline: '1-3_months' as 'immediate' | '1-3_months' | 'exploring',
     additionalNotes: ''
   });
+
+  const [showForm, setShowForm] = useState(false);
 
   const areasOptions = [
     'Bulk proteins',
@@ -34,7 +40,15 @@ export function PreferenceFormPage() {
   useEffect(() => {
     const validateToken = async () => {
       try {
-        const res = await apiPost('/api/agents/preferences/validate', {
+        const res = await apiPost<{
+          valid: boolean;
+          alreadySubmitted?: boolean;
+          companyName: string;
+          contactName?: string;
+          email?: string;
+          role?: string;
+          areasOfInterest?: string[];
+        }>('/api/agents/preferences/validate', {
           contactId: params.contactId,
           token: params.token
         });
@@ -42,10 +56,16 @@ export function PreferenceFormPage() {
         if (res.ok && res.data.valid) {
           setTokenValid(true);
           setCompanyName(res.data.companyName);
+          if (res.data.alreadySubmitted) {
+            setAlreadySubmitted(true);
+          }
 
           const interests = res.data.areasOfInterest || areasOptions.slice(0, 4);
           setFormData(prev => ({
             ...prev,
+            name: res.data.contactName || prev.name,
+            email: res.data.email || prev.email,
+            role: res.data.role || prev.role,
             areasOfInterest: interests
           }));
         } else {
@@ -80,7 +100,9 @@ export function PreferenceFormPage() {
     setError('');
 
     try {
-      const res = await apiPost('/api/agents/preferences/submit', {
+      const endpoint = alreadySubmitted ? '/api/agents/preferences/update' : '/api/agents/preferences/submit';
+      const method = alreadySubmitted ? apiPut<{ success: boolean }> : apiPost<{ success: boolean }>;
+      const res = await method(endpoint, {
         contactId: params.contactId,
         token: params.token,
         ...formData
@@ -123,6 +145,27 @@ export function PreferenceFormPage() {
     );
   }
 
+  if (alreadySubmitted && !showForm) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">📋</span>
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">Preferences Already Submitted</h1>
+          <p className="text-slate-600 mb-4">You've already submitted your preferences for <strong>{companyName}</strong>.</p>
+          <p className="text-slate-500 text-sm mb-8">If your preferences have changed, you can update them below.</p>
+          <button
+            onClick={() => setShowForm(true)}
+            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-all"
+          >
+            Update Preferences
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (success) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
@@ -133,13 +176,34 @@ export function PreferenceFormPage() {
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Preferences Confirmed</h1>
           <p className="text-slate-600 mb-6">Thank you! We'll be in touch soon based on your preferences.</p>
           <p className="text-sm text-slate-500 mb-8">Company: {companyName}</p>
-          <div className="bg-slate-50 rounded-xl p-6 text-left">
+          <div className="bg-slate-50 rounded-xl p-6 text-left mb-6">
             <h2 className="text-sm font-semibold text-slate-900 mb-3">What happens next:</h2>
             <ul className="space-y-2 text-sm text-slate-600">
               <li>• A member of our team will review your preferences</li>
               <li>• You'll receive a follow-up email within 24-48 hours</li>
               <li>• We'll contact you via your preferred method</li>
             </ul>
+          </div>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => { setSuccess(false); setShowForm(true); }}
+              className="text-sm text-blue-600 hover:text-blue-700 underline"
+            >
+              Need to update your preferences?
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  await apiPost('/api/agents/preferences/withdraw', { contactId: params.contactId });
+                  setSuccess(false);
+                  setTokenValid(false);
+                  setError('Your consent has been withdrawn.');
+                } catch {}
+              }}
+              className="text-sm text-rose-500 hover:text-rose-600 underline"
+            >
+              Withdraw consent
+            </button>
           </div>
         </div>
       </div>
@@ -159,6 +223,39 @@ export function PreferenceFormPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="bg-white rounded-xl p-6 border border-slate-200 space-y-4">
+              <h2 className="text-sm font-semibold text-slate-900">Your Contact Details</h2>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-lg border-2 border-slate-200 focus:border-blue-500 focus:outline-none text-slate-900 text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-lg border-2 border-slate-200 focus:border-blue-500 focus:outline-none text-slate-900 text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Role / Position</label>
+                <input
+                  type="text"
+                  value={formData.role}
+                  onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-lg border-2 border-slate-200 focus:border-blue-500 focus:outline-none text-slate-900 text-sm"
+                />
+              </div>
+            </div>
+
             <div className="bg-white rounded-xl p-6 border border-slate-200">
               <div className="flex items-start gap-3">
                 <input
@@ -281,7 +378,7 @@ export function PreferenceFormPage() {
               disabled={!formData.consentGiven || submitting}
               className="w-full py-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-all"
             >
-              {submitting ? 'Submitting...' : 'Confirm Preferences'}
+              {submitting ? 'Submitting...' : alreadySubmitted ? 'Update Preferences' : 'Confirm Preferences'}
             </button>
 
             <p className="text-center text-xs text-slate-500">
