@@ -32,6 +32,8 @@ export function normalizeCompanyName(name: string): string {
     .trim();
 }
 
+const OWN_COMPANY_NORM = normalizeCompanyName("Siemens Healthineers");
+
 /** Merge signals from multiple sources for the same company. De-duplicate by type+date+desc. */
 function mergeSignals(candidates: LeadCandidate[]): LeadCandidate {
   const base = { ...candidates[0] };
@@ -222,7 +224,9 @@ export class SourceManager {
       });
     }
 
-    for (const [, group] of groups) {
+    for (const [key, group] of groups) {
+      if (key === OWN_COMPANY_NORM) continue; // Skip our own company — we generate leads FOR them
+
       const merged = mergeSignals(group);
       // Upsert using the best/preferred company name (longest, most descriptive)
       const bestName = group.sort((a, b) => b.companyName.length - a.companyName.length)[0];
@@ -271,7 +275,9 @@ export class SourceManager {
       groups.get(key)!.push(c);
     }
 
-    for (const [, group] of groups) {
+    for (const [key, group] of groups) {
+      if (key === OWN_COMPANY_NORM) continue;
+
       const merged = mergeSignals(group);
       const bestName = group.sort((a, b) => b.companyName.length - a.companyName.length)[0];
       merged.companyName = bestName.companyName;

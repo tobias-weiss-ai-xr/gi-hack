@@ -83,7 +83,7 @@ export async function scoreAll(): Promise<ScoredResult[]> {
 
   // Get Siemens applications for product fit scoring
   const siemensResult = await queryRows(
-    `MATCH (:Company {name: "Siemens Healthineers"})-[:SUPPLIES]->(:Product)-[:USED_IN]->(a:Application)
+    `MATCH (:Company {normalizedName: "siemens healthineers"})-[:SUPPLIES]->(:Product)-[:USED_IN]->(a:Application)
      RETURN collect(DISTINCT a.name) AS apps`
   );
   const siemensApps: string[] = (siemensResult[0] as any)?.apps ?? [];

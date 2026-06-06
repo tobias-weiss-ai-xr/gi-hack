@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { runQuery, verifyConnection } from "../services/graph/neo4j.js";
 import { seedGraph, truncateGraph, getOrchestrator } from "../services/graph/ingest/index.js";
+import { createJob, startJob, completeJob, completeAdapter, failJob, getJob } from "../services/graph/ingest/job-tracker.js";
 
 const router = Router();
 
@@ -37,18 +38,44 @@ router.get("/health", async (_req: Request, res: Response) => {
   res.json({ ok: true, data: { connected } });
 });
 
-router.post("/ingest", async (req: Request, res: Response) => {
-  try {
-    const source = req.query.source as string | undefined;
-    const orchestrator = getOrchestrator();
-    const result = source
-      ? await orchestrator.runSingle(source)
-      : await orchestrator.runAll();
-    res.json({ ok: true, data: { ingestion: result } });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    res.status(500).json({ ok: false, error: { code: "INGEST_FAILED", message } });
+router.post("/ingest", (req: Request, res: Response) => {
+  const source = req.query.source as string | undefined;
+  const orchestrator = getOrchestrator();
+
+  if (source) {
+    // Single source — run synchronously (fast)
+    orchestrator.runSingle(source)
+      .then((result) => res.json({ ok: true, data: { ingestion: [result], source } }))
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        res.status(500).json({ ok: false, error: { code: "INGEST_FAILED", message } });
+      });
+  } else {
+    // Full ingest — run in background with progress tracking
+    const total = orchestrator.getRegistered().length;
+    const jobId = createJob(total);
+    startJob(jobId);
+
+    orchestrator.runAll((summary) => completeAdapter(jobId, summary))
+      .then(() => {
+        completeJob(jobId);
+      })
+      .catch((err) => {
+        failJob(jobId, err instanceof Error ? err.message : String(err));
+      });
+
+    res.json({ ok: true, data: { jobId } });
   }
+});
+
+router.get("/ingest/status/:jobId", (req: Request, res: Response) => {
+  const jobId = req.params.jobId as string;
+  const job = getJob(jobId);
+  if (!job) {
+    res.status(404).json({ ok: false, error: { code: "JOB_NOT_FOUND", message: `No ingest job "${jobId}"` } });
+    return;
+  }
+  res.json({ ok: true, data: job });
 });
 
 router.delete("/ingest", async (_req: Request, res: Response) => {
@@ -58,6 +85,31 @@ router.delete("/ingest", async (_req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ ok: false, error: { code: "TRUNCATE_FAILED", message } });
+  }
+});
+
+router.get("/stats", async (_req: Request, res: Response) => {
+  try {
+    const [companies, products, applications, signals, relationships] = await Promise.all([
+      runQuery("MATCH (c:Company) RETURN count(c) AS count"),
+      runQuery("MATCH (p:Product) RETURN count(p) AS count"),
+      runQuery("MATCH (a:Application) RETURN count(a) AS count"),
+      runQuery("MATCH (s:Signal) RETURN count(s) AS count"),
+      runQuery("MATCH ()-[r]->() RETURN count(r) AS count"),
+    ]);
+    res.json({
+      ok: true,
+      data: {
+        companies: Number(companies.records?.[0]?.get("count") ?? 0),
+        products: Number(products.records?.[0]?.get("count") ?? 0),
+        applications: Number(applications.records?.[0]?.get("count") ?? 0),
+        signals: Number(signals.records?.[0]?.get("count") ?? 0),
+        totalRelationships: Number(relationships.records?.[0]?.get("count") ?? 0),
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ ok: false, error: { code: "STATS_FAILED", message } });
   }
 });
 

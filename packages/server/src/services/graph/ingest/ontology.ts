@@ -217,104 +217,117 @@ const COMPANIES: Array<{
 ];
 
 export async function seedGraph(): Promise<SeedSummary> {
-  let constraintsCreated = 0;
-  let applicationAreas = 0;
-  let companiesSeeded = 0;
-  let productsSeeded = 0;
-  let relationshipsCreated = 0;
-
   // Create constraints (idempotent — IF NOT EXISTS)
-  // normalizedName is the unique key, matching orchestrator.ts cross-source dedup
   await runQuery("CREATE CONSTRAINT IF NOT EXISTS FOR (c:Company) REQUIRE c.normalizedName IS UNIQUE");
   await runQuery("CREATE CONSTRAINT IF NOT EXISTS FOR (a:Application) REQUIRE a.name IS UNIQUE");
   await runQuery("CREATE INDEX IF NOT EXISTS FOR (s:Signal) ON (s.type)");
-  constraintsCreated = 3;
 
-  // Create Siemens as a baseline company
+  // Batch 1: Siemens + all applications
   await runQuery(
     `MERGE (c:Company {normalizedName: $normName})
      SET c.name = $name, c.domain = $domain, c.description = $description, c.segment = $segment, c.region = $region`,
     { normName: normalizeCompanyName("Siemens Healthineers"), name: "Siemens Healthineers", domain: "siemens-healthineers.com", description: "Global medical technology company — Marburg site produces biological intermediates for diagnostics", segment: "IVD_MANUFACTURER", region: "EUROPE" }
   );
-  companiesSeeded++;
 
-  // Create application areas
-  for (const area of APPLICATION_AREAS) {
-    await runQuery(
-      `MERGE (a:Application {name: $name})
-       SET a.category = $category`,
-      { name: area, category: "DIAGNOSTICS" }
-    );
-    applicationAreas++;
-  }
+  await runQuery(
+    `UNWIND $apps AS app
+     MERGE (a:Application {name: app.name})
+     SET a.category = app.category`,
+    { apps: APPLICATION_AREAS.map((name) => ({ name, category: "DIAGNOSTICS" })) }
+  );
 
-  // Create Siemens products linked to applications
-  for (const product of PRODUCTS) {
-    await runQuery(
-      `MERGE (p:Product {catalogId: $catalogId})
-       SET p.name = $name, p.category = $category`,
-      { catalogId: `SH-${product.name.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`, name: product.name, category: product.category }
-    );
-    productsSeeded++;
+  // Batch 2: All products + links to Siemens
+  const productRows = PRODUCTS.map((p) => ({
+    catalogId: `SH-${p.name.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`,
+    name: p.name,
+    category: p.category,
+  }));
+  await runQuery(
+    `UNWIND $products AS p
+     MERGE (prod:Product {catalogId: p.catalogId})
+     SET prod.name = p.name, prod.category = p.category
+     WITH prod, p
+     MATCH (c:Company {normalizedName: $normName})
+     MERGE (c)-[:SUPPLIES]->(prod)`,
+    { products: productRows, normName: normalizeCompanyName("Siemens Healthineers") }
+  );
 
-    // Link product to Siemens
-    await runQuery(
-      `MATCH (c:Company {normalizedName: $normName}), (p:Product {catalogId: $catalogId})
-       MERGE (c)-[:SUPPLIES]->(p)`,
-      { normName: normalizeCompanyName("Siemens Healthineers"), catalogId: `SH-${product.name.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}` }
-    );
-    relationshipsCreated++;
-
-    // Link product to applications
-    for (const app of product.applications) {
-      await runQuery(
-        `MATCH (p:Product {catalogId: $catalogId}), (a:Application {name: $app})
-         MERGE (p)-[:USED_IN]->(a)`,
-        { catalogId: `SH-${product.name.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`, app }
-      );
-      relationshipsCreated++;
+  // Batch 3: All product→application links
+  const productAppRows: Array<{ catalogId: string; app: string }> = [];
+  for (const p of PRODUCTS) {
+    const catalogId = `SH-${p.name.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`;
+    for (const app of p.applications) {
+      productAppRows.push({ catalogId, app });
     }
   }
+  await runQuery(
+    `UNWIND $links AS l
+     MATCH (p:Product {catalogId: l.catalogId}), (a:Application {name: l.app})
+     MERGE (p)-[:USED_IN]->(a)`,
+    { links: productAppRows }
+  );
 
-  // Create competitor companies with signals
-  for (const company of COMPANIES) {
-    await runQuery(
-      `MERGE (c:Company {normalizedName: $normName})
-       SET c.name = $name, c.domain = $domain, c.description = $description, c.segment = $segment, c.region = $region`,
-      { normName: normalizeCompanyName(company.name), name: company.name, domain: company.domain, description: company.description, segment: company.segment, region: company.region }
-    );
-    companiesSeeded++;
+  // Batch 4: All companies
+  const companyRows = COMPANIES.map((c) => ({
+    normName: normalizeCompanyName(c.name),
+    name: c.name,
+    domain: c.domain,
+    description: c.description,
+    segment: c.segment,
+    region: c.region,
+  }));
+  await runQuery(
+    `UNWIND $companies AS c
+     MERGE (comp:Company {normalizedName: c.normName})
+     SET comp.name = c.name, comp.domain = c.domain,
+         comp.description = c.description, comp.segment = c.segment,
+         comp.region = c.region`,
+    { companies: companyRows }
+  );
 
-    // Link to application areas
-    for (const app of company.applications) {
-      await runQuery(
-      `MATCH (c:Company {normalizedName: $normName}), (a:Application {name: $app})
-       MERGE (c)-[:DEVELOPS]->(a)`,
-      { normName: normalizeCompanyName(company.name), app }
-      );
-      relationshipsCreated++;
-    }
-
-    // Create signals
-    for (const signal of company.signals) {
-      await runQuery(
-      `MATCH (c:Company {normalizedName: $normName})
-       CREATE (s:Signal {
-         type: $type, date: $date, confidence: $confidence,
-         description: $description, url: $url
-       })
-       MERGE (c)-[:HAS_SIGNAL]->(s)`,
-      { normName: normalizeCompanyName(company.name), type: signal.type, date: signal.date, confidence: signal.confidence, description: signal.description, url: null }
-      );
-      relationshipsCreated++;
+  // Batch 5: All company→application links
+  const companyAppRows: Array<{ normName: string; app: string }> = [];
+  for (const c of COMPANIES) {
+    const normName = normalizeCompanyName(c.name);
+    for (const app of c.applications) {
+      companyAppRows.push({ normName, app });
     }
   }
+  await runQuery(
+    `UNWIND $links AS l
+     MATCH (c:Company {normalizedName: l.normName}), (a:Application {name: l.app})
+     MERGE (c)-[:DEVELOPS]->(a)`,
+    { links: companyAppRows }
+  );
+
+  // Batch 6: All signals
+  const signalRows: Array<{ normName: string; type: string; date: string; confidence: number; description: string }> = [];
+  for (const c of COMPANIES) {
+    const normName = normalizeCompanyName(c.name);
+    for (const s of c.signals) {
+      signalRows.push({ normName, ...s });
+    }
+  }
+  await runQuery(
+    `UNWIND $signals AS sig
+     MATCH (c:Company {normalizedName: sig.normName})
+     CREATE (s:Signal {
+       type: sig.type, date: sig.date, confidence: sig.confidence,
+       description: sig.description, url: null
+     })
+     MERGE (c)-[:HAS_SIGNAL]->(s)`,
+    { signals: signalRows }
+  );
 
   return {
-    constraintsCreated,
-    applicationAreas,
-    companiesSeeded,
-    productsSeeded,
-    relationshipsCreated,
+    constraintsCreated: 3,
+    applicationAreas: APPLICATION_AREAS.length,
+    companiesSeeded: 1 + COMPANIES.length,
+    productsSeeded: PRODUCTS.length,
+    relationshipsCreated:
+      1 + // Siemens→products (batched)
+      productAppRows.length +
+      companyAppRows.length +
+      signalRows.length,
   };
 }

@@ -37,7 +37,8 @@ export type SignalType =
   | "HIRING"
   | "FUNDING"
   | "CONFERENCE"
-  | "NEWS";
+  | "NEWS"
+  | "RESEARCH_PUBLICATION";
 
 export interface IngestionSummary {
   sourceId: string;
