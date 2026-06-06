@@ -44,7 +44,7 @@ function StageColumn({
     <div className="bg-gray-900 rounded-lg border border-gray-800 min-w-[260px] flex-shrink-0">
       <div className="px-4 py-3 border-b border-gray-800">
         <h3 className="font-semibold text-sm text-cyan-400">{stage}</h3>
-        <span className="text-xs text-gray-500">{leads.length} leads</span>
+        <span className="text-xs text-gray-400">{leads.length} leads</span>
       </div>
 
       <div className="p-2 space-y-2 min-h-[200px]">
@@ -64,7 +64,7 @@ function StageColumn({
                   onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                 />
                 <div className="flex gap-1">
-                  <button onClick={handleAdd} className="bg-cyan-600 hover:bg-cyan-500 text-xs px-2 py-1 rounded">
+                  <button onClick={handleAdd} className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-2 py-1 rounded">
                     Add
                   </button>
                   <button onClick={() => setAdding(false)} className="text-xs text-gray-400 px-2 py-1">
@@ -75,7 +75,7 @@ function StageColumn({
             ) : (
               <button
                 onClick={() => setAdding(true)}
-                className="w-full text-left text-gray-500 hover:text-white text-xs py-2 transition-colors"
+                className="w-full text-left text-gray-400 hover:text-white text-xs py-2 transition-colors"
               >
                 + Add lead
               </button>
@@ -107,7 +107,7 @@ function LeadCard({
         <div className="min-w-0">
           <h4 className="text-sm font-medium truncate">{lead.companyName}</h4>
           {lead.companySegment && (
-            <span className="text-[10px] text-gray-500 uppercase tracking-wider">{lead.companySegment}</span>
+            <span className="text-[10px] text-gray-400 uppercase tracking-wider">{lead.companySegment}</span>
           )}
         </div>
         {!isLast && contact && (
@@ -122,13 +122,13 @@ function LeadCard({
       </div>
 
       {lead.lastActivity && (
-        <p className="text-xs text-gray-500 mt-1 truncate">{lead.lastActivity}</p>
+        <p className="text-xs text-gray-400 mt-1 truncate">{lead.lastActivity}</p>
       )}
 
       <div className="flex items-center gap-2 mt-1">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="text-xs text-gray-500 hover:text-cyan-400 transition-colors"
+          className="text-xs text-gray-400 hover:text-cyan-400 transition-colors"
         >
           {expanded ? "▲ Less" : "▼ Details"}
         </button>
@@ -150,7 +150,7 @@ function LeadCard({
               } catch {}
             }}
             disabled={genLink.isPending}
-            className="text-xs text-gray-500 hover:text-cyan-400 transition-colors disabled:opacity-40"
+            className="text-xs text-gray-400 hover:text-cyan-400 transition-colors disabled:opacity-40"
           >
             {genLink.isPending ? "..." : copied ? "✓ Copied!" : "🔗 Link"}
           </button>
@@ -200,7 +200,7 @@ function ContactDetail({ contactId }: { contactId: string }) {
           <button
             onClick={handleAddNote}
             disabled={addActivity.isPending}
-            className="bg-cyan-600 hover:bg-cyan-500 text-xs px-2 py-1 rounded disabled:opacity-50"
+            className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-2 py-1 rounded disabled:opacity-50"
           >
             Save
           </button>
@@ -230,10 +230,10 @@ function ContactDetail({ contactId }: { contactId: string }) {
 
       {activities && activities.length > 0 && (
         <div className="space-y-1 max-h-32 overflow-y-auto">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Activity</p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider">Activity</p>
           {activities.slice(0, 5).map((a) => (
             <div key={a.id} className="text-xs text-gray-400">
-              <span className="text-gray-600">{new Date(a.date).toLocaleDateString()}</span> {a.note}
+              <span className="text-gray-400">{new Date(a.date).toLocaleDateString()}</span> {a.note}
             </div>
           ))}
         </div>
@@ -280,14 +280,14 @@ export function PipelinePage() {
           >
             {runOutreach.isPending ? "⏳ Running..." : "🚀 Run Outreach"}
           </button>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-400">
             {leads ? `${leads.length} total` : "Loading..."}
           </p>
         </div>
       </div>
 
       {leadsLoading && (
-        <div className="text-gray-500 text-sm">Loading pipeline...</div>
+        <div className="text-gray-400 text-sm">Loading pipeline...</div>
       )}
 
       <div className="flex gap-4 overflow-x-auto pb-4">
