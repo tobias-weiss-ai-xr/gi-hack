@@ -120,6 +120,29 @@ router.get("/ingest/sources", async (_req: Request, res: Response) => {
   res.json({ ok: true, data: { sources: names, health } });
 });
 
+router.post("/validate-domains", async (_req: Request, res: Response) => {
+  try {
+    const { validateAllDomains } = await import("../services/graph/domain-validator.js");
+    const result = await validateAllDomains();
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ ok: false, error: { code: "VALIDATION_FAILED", message } });
+  }
+});
+
+router.post("/enrich-domains", async (_req: Request, res: Response) => {
+  try {
+    const { enrichDomains } = await import("../services/graph/domain-finder.js");
+    const { limit, concurrency } = _req.body ?? {};
+    const result = await enrichDomains({ limit, concurrency });
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ ok: false, error: { code: "DOMAIN_ENRICH_FAILED", message } });
+  }
+});
+
 router.get("/score", async (_req: Request, res: Response) => {
   try {
     const { scoreAll } = await import("../services/graph/scoring/scorer.js");
@@ -136,6 +159,29 @@ router.get("/score", async (_req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ ok: false, error: { code: "SCORING_FAILED", message } });
+  }
+});
+
+router.post("/classify-segments", async (_req: Request, res: Response) => {
+  try {
+    const { classifyAllSegments } = await import("../services/graph/scoring/segment-classifier.js");
+    const { limit, concurrency } = _req.body ?? {};
+    const result = await classifyAllSegments({ limit, concurrency });
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ ok: false, error: { code: "SEGMENT_CLASSIFY_FAILED", message } });
+  }
+});
+
+router.post("/score/run", async (_req: Request, res: Response) => {
+  try {
+    const { scoreAll } = await import("../services/graph/scoring/scorer.js");
+    const companies = await scoreAll();
+    res.json({ scored: companies.length });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ ok: false, error: { code: "SCORE_RUN_FAILED", message } });
   }
 });
 
