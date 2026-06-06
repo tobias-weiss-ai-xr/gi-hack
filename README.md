@@ -19,33 +19,150 @@ A ready-to-hack boilerplate for the **StartMiUp Hackathon – AI for Mittelhesse
 # 1. Start Neo4j
 docker compose up -d neo4j
 
-# 2. Configure environment
-cp .env.example .env
-# Edit .env — add your OPENAI_API_KEY
+# 2. Bootstrap database OR skip to step 3 for empty DB
+# Option A: Load pre-built leads (recommended - fastest start)
+docker compose --profile bootstrap run bootstrap
+# Option B: Or run: npm run db:bootstrap
 
-# 3. Install dependencies
+# 3. Configure environment
+cp .env.example .env
+# Edit .env — add your OPENAI_API_KEY (optional, for AI features)
+
+# 4. Install dependencies  
 npm install
 
-# 4. Start development
+# 5. Start development
 npm run dev
 ```
 
 Open **http://localhost:5173** — client on :5173, server on :3001, Neo4j Browser on :7474.
 
-### Database Bootstrap
+**Database Options:**
+- **Bootstrap** (fastest): Pre-loaded with 1,300 companies, 1,800 signals, scored leads
+- **Live Ingestion**: Fresh data from FDA, GitHub, ClinicalTrials, OpenAlex, etc. (requires API keys)
+- **Empty**: Start from scratch, use `/api/graph/seed` to load base ontology only
 
-To populate a fresh Neo4j with pre-ingested data (1,300 companies, 1,800 signals, scored and ready):
+### Database Bootstrap & Import
+
+The application includes a pre-built Neo4j bootstrap with ready-to-use lead data. This allows you to quickly get started with populated companies, signals, and scoring without running the full ingestion pipeline.
+
+**Pre-loaded Data:**
+- ~1,300 companies across IVD manufacturers, diagnostics, and life sciences
+- ~1,800 signals (FDA clearances, clinical trials, publications, patents, conferences)
+- Applications and products for context matching
+- Pre-computed lead scores with HOT/WARM/COLD tiers
+
+**Bootstrap Methods:**
 
 ```bash
-# Option A: Docker bootstrap service (recommended)
+# Start Neo4j first (required)
 docker compose up -d neo4j
-docker compose --profile bootstrap run bootstrap
 
-# Option B: Run locally via npm
+# Option A: Docker bootstrap service (recommended for fresh installs)
+docker compose --profile bootstrap run bootstrap
+# This automatically waits for Neo4j to be ready then loads the bootstrap data
+
+# Option B: Direct npm script (for re-running after data changes)
 npm run db:bootstrap
+# Requires: NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD env vars
+# (Defaults: bolt://localhost:7687, neo4j, password)
+
+# Option C: Custom environment
+NEO4J_URI="bolt://localhost:7687" NEO4J_PASSWORD="yourpassword" npm run db:bootstrap
 ```
 
-To re-snapshot the current DB state: `npm run db:export`
+**How Bootstrap Works:**
+
+The bootstrap process executes 4,765+ idempotent Cypher statements from `packages/server/db/bootstrap.cypher`:
+
+1. **Constraints & Indices:** Creates uniqueness constraints and indexes for fast queries
+2. **Ontology:** Seeds applications (diagnostics categories) and Siemens products as reference data
+3. **Companies:** Loads company profiles with domains, segments, and descriptions
+4. **Signals:** Imports signals attributed to companies (FDA clearances, trials, etc.)
+5. **Relationships:** Links companies to signals, applications, and products
+
+**Refreshing Bootstrap Data:**
+
+If you modify `packages/server/db/bootstrap.cypher`, re-run the bootstrap:
+
+```bash
+# Clean and restart to test changes
+docker compose down -v          # Removes old Neo4j data
+docker compose up -d neo4j      # Fresh Neo4j instance
+npm run db:bootstrap            # Load updated bootstrap
+```
+
+**Creating New Bootstrap Snapshots:**
+
+To export the current Neo4j state as a reusable bootstrap file:
+
+```bash
+npm run db:export
+# Generates: packages/server/db/bootstrap.cypher
+# Contains all current data as idempotent MERGE statements
+```
+
+**Troubleshooting:**
+
+- **"Database unavailable"**: Neo4j is still starting - wait 10-15 seconds after `docker compose up -d neo4j`
+- **"Authentication failure"**: Check Neo4j is running with default password (`password`) or set `NEO4J_PASSWORD` env var
+- **Partial import**: Check Neo4j logs with `docker compose logs neo4j` - bootstrap continues on statement errors
+
+### Live Data Ingestion (Alternative to Bootstrap)
+
+For fresh data from external sources, the application supports 12 real-time ingestion adapters:
+
+**Available Data Sources:**
+| Source | Type | Coverage | Signals |
+|--------|------|----------|---------|
+| FDA 510(k) | Real API | US medical devices | FDA_CLEARANCE |
+| GitHub | Real API | Diagnostic orgs & repos | GITHUB_ACTIVITY |
+| ClinicalTrials.gov | Real API | Global clinical trials | CLINICAL_TRIAL |
+| OpenAlex | Real API | Research publications | RESEARCH_PUBLICATION |
+| DRKS | Real API | German trials registry | CLINICAL_TRIAL |
+| EPO OPS | Real API | European patents | PATENT |
+| MEDICA | Web Scraping | DACH conference exhibitors | CONFERENCE |
+| BMBF FÖKAT | CSV Export | German funded projects | FUNDING |
+| Patent|Hiring|Conference|Funding | Stub/Simulated | Fallback data | Various |
+
+**Running Live Ingestion:**
+
+```bash
+# Seed ontology first (required before ingestion)
+curl -X POST http://localhost:3001/api/graph/seed
+
+# Run all ingestion adapters
+npm run ingest
+# Or via API: curl -X POST http://localhost:3001/api/graph/ingest
+
+# Run specific source only
+npm run ingest -- --source=fda-510k
+# Available sources: fda-510k, github, clinical-trials, openalex, drks, epo,
+# medica, foekat, patent-stub, hiring-stub, conference-stub, funding-stub
+
+# Run seed + full pipeline (recommended for fresh setup)
+npm run ingest:seed
+# Equivalent to: seed → ingest all sources → score all companies
+```
+
+**Scoring Pipeline:**
+
+After ingestion, run the scoring algorithm to compute lead rankings:
+
+```bash
+# Score all companies
+npm run score
+# Or via API: curl -X GET http://localhost:3001/api/graph/score
+```
+
+The scoring algorithm computes:
+- **Signal Score** (0-40): Weighted sum of signal confidence × recency  
+- **Product Fit** (0-30): Application overlap with Siemens products
+- **Segment Bonus** (0-20): Industry segment relevance (IVD=20, CDMO=15, etc.)
+- **Recency Bonus** (0-10): Time since last activity signal
+- **Total Score** (0-100): Sum of components → Tier assignment (HOT≥70, WARM≥40, COLD<40)
+
+**Note:** Live ingestion requires API keys and network access. Use bootstrap for quick start, then run live ingestion for fresh data.
 
 ## Project Structure
 
@@ -73,13 +190,17 @@ gi-hack/
 | GET | `/api/health` | Server health check |
 | GET | `/api/graph/health` | Neo4j connectivity check |
 | POST | `/api/graph/query` | Execute Cypher query |
-| POST | `/api/graph/seed` | Seed ontology |
-| POST | `/api/graph/ingest` | Run ingest (all or `?source=`) |
+| POST | `/api/graph/seed` | Seed ontology (applications, products, Siemens) |
+| POST | `/api/graph/ingest` | Run live ingest (all real sources or `?source=` specific) |
 | POST | `/api/graph/ingest/status/:jobId` | Async ingest job progress |
-| GET | `/api/graph/ingest/sources` | Registered adapters + health |
-| GET | `/api/graph/score` | Score all prospects |
+| GET | `/api/graph/ingest/sources` | Registered adapters + health status |
+| GET | `/api/graph/score` | Score all prospects (or manually via npm run score) |
 | GET | `/api/graph/stats` | Graph node/relationship counts |
-| DELETE | `/api/graph/ingest` | Truncate graph |
+| DELETE | `/api/graph/ingest` | Truncate graph (reset to empty) |
+
+**Data Loading Options:**
+- **Bootstrap**: `npm run db:bootstrap` — Loads pre-built snapshot fastest
+- **Live Ingest**: `npm run ingest` — Fetches fresh data from 12 real sources
 | GET | `/api/pipeline/stages` | Pipeline stage definitions |
 | GET | `/api/pipeline/leads` | All pipeline leads |
 | POST | `/api/pipeline/start` | Start pipeline tracking |
