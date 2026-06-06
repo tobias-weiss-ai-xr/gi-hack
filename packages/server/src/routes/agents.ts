@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import neo4j from "neo4j-driver";
 import { getContactFinder } from "../services/agents/contactFinder.js";
 import { generateOutreachEmail } from "../services/ai/outreach.js";
+import { sendEmail } from "../services/agents/emailSender.js";
 
 const router = Router();
 
@@ -138,6 +139,15 @@ router.post("/outreach/run", async (_req: Request, res: Response): Promise<any> 
             tier: (company.tier as "HOT" | "WARM") || "WARM",
             matchedItemsCount: applications.length || 6,
           });
+
+          // Send the email via demo transport
+          if (emailDraft) {
+            try {
+              await sendEmail({ to: contacts.contacts[0].email, subject: `Partnership opportunity: ${company.name} × GI-Hack`, body: emailDraft, from: "partnerships@gi-hack.com" });
+            } catch {
+              // Email send failure is non-fatal — log and continue
+            }
+          }
         } catch {
           emailDraft = null;
         }
@@ -163,6 +173,109 @@ router.post("/outreach/run", async (_req: Request, res: Response): Promise<any> 
     });
   } catch (err: any) {
     return res.status(500).json({ ok: false, error: { code: "OUTREACH_BATCH_FAILED", message: err.message } });
+  } finally {
+    await session.close();
+  }
+});
+
+// ── POST /agents/preferences/generate-token ───────────────────────────────────
+router.post("/preferences/generate-token", async (req: Request, res: Response): Promise<any> => {
+  const { contactId, companyName, contactName, email, role } = req.body;
+  if (!contactId || !companyName) {
+    return res.status(400).json({ ok: false, error: { code: "INVALID_INPUT", message: "contactId and companyName are required" } });
+  }
+  try {
+    const { generateToken } = await import("../services/agents/preferences.js");
+    const result = generateToken({ contactId, companyName, contactName, email, role });
+    return res.json({ ok: true, data: result });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: { code: "TOKEN_FAILED", message: err.message } });
+  }
+});
+
+// ── POST /agents/preferences/validate ─────────────────────────────────────────
+router.post("/preferences/validate", async (req: Request, res: Response): Promise<any> => {
+  const { contactId, token } = req.body;
+  if (!contactId || !token) {
+    return res.status(400).json({ ok: false, data: { valid: false } });
+  }
+  try {
+    const { validateToken } = await import("../services/agents/preferences.js");
+    const result = validateToken(token, contactId);
+    return res.json({ ok: true, data: result });
+  } catch {
+    return res.json({ ok: true, data: { valid: false } });
+  }
+});
+
+// ── POST /agents/preferences/submit ───────────────────────────────────────────
+router.post("/preferences/submit", async (req: Request, res: Response): Promise<any> => {
+  const { contactId, token, consentGiven, preferredContactMethod, interestLevel, areasOfInterest, timeline, additionalNotes } = req.body;
+  if (!contactId || !token) {
+    return res.status(400).json({ ok: false, error: { code: "INVALID_INPUT", message: "contactId and token are required" } });
+  }
+  if (!consentGiven) {
+    return res.status(400).json({ ok: false, error: { code: "CONSENT_REQUIRED", message: "Consent must be given" } });
+  }
+  const session = driver.session();
+  try {
+    const { consumeToken } = await import("../services/agents/preferences.js");
+    const stored = consumeToken(token);
+    if (!stored || stored.contactId !== contactId) {
+      return res.status(400).json({ ok: false, error: { code: "INVALID_TOKEN", message: "Token expired or invalid" } });
+    }
+
+    // Update Contact node in Neo4j with preferences
+    await session.run(
+      `MERGE (c:Contact {id: $contactId})
+       SET c.name = $name,
+           c.email = $email,
+           c.role = $role,
+           c.consentGiven = true,
+           c.consentDate = toString(datetime()),
+           c.preferredContactMethod = $method,
+           c.interestLevel = $interest,
+           c.interestedAreas = $areas,
+           c.timeline = $timeline,
+           c.additionalNotes = $notes`,
+      { contactId, name: stored.contactName, email: stored.email, role: stored.role, method: preferredContactMethod || "email", interest: interestLevel || "medium", areas: areasOfInterest || [], timeline: timeline || "exploring", notes: additionalNotes || "" },
+    );
+
+    await session.run(
+      `MATCH (c:Contact {id: $contactId})
+       CREATE (a:Activity {
+         id: randomUUID(),
+         type: 'PREFERENCE_CONFIRMED',
+         note: 'Customer confirmed communication preferences. Consent: ' + toString($consentGiven) + ', Method: ' + $method,
+         date: toString(datetime())
+       })
+       CREATE (c)-[:HAS_ACTIVITY]->(a)`,
+      { contactId, consentGiven, method: preferredContactMethod || "email" },
+    );
+
+    // If interest level is not 'exploring', advance to Contacted stage
+    const advanceStages = new Set(["high", "medium"]);
+    if (advanceStages.has(interestLevel || "")) {
+      const stageResult = await session.run(
+        `MATCH (c:Contact {id: $contactId})-[:IN_STAGE]->(s:PipelineStage)
+         RETURN s.stage AS stage`,
+        { contactId },
+      );
+      const currentStage = stageResult.records[0]?.get("stage");
+      if (currentStage === "New") {
+        await session.run(
+          `MATCH (c:Contact {id: $contactId})-[r:IN_STAGE]->(s:PipelineStage)
+           DELETE r, s
+           WITH c
+           CREATE (c)-[:IN_STAGE]->(:PipelineStage {stage: 'Contacted', enteredAt: toString(datetime())})`,
+          { contactId },
+        );
+      }
+    }
+
+    return res.json({ ok: true, data: { success: true } });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: { code: "SUBMIT_FAILED", message: err.message } });
   } finally {
     await session.close();
   }
