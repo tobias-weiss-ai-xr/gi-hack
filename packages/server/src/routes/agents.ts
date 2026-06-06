@@ -3,6 +3,8 @@ import neo4j from "neo4j-driver";
 import { getContactFinder } from "../services/agents/contactFinder.js";
 import { generateOutreachEmail } from "../services/ai/outreach.js";
 import { sendEmail } from "../services/agents/emailSender.js";
+import { qualifyLeads } from "../services/agents/leadQualifier.js";
+import { buildCompanyProfile } from "../services/agents/companyProfiler.js";
 
 const router = Router();
 
@@ -64,88 +66,57 @@ router.post("/find-contacts", async (req: Request, res: Response): Promise<any> 
 router.post("/outreach/run", async (_req: Request, res: Response): Promise<any> => {
   const session = driver.session();
   try {
-    const { scoreAll } = await import("../services/graph/scoring/scorer.js");
-    const scoredCompanies = await scoreAll();
-
-    const contactCheck = await session.run(
-      `MATCH (c:Company)<-[:CONTACT_AT]-(:Contact)
-       RETURN c.name AS name`,
-    );
-    const hasContact = new Set(contactCheck.records.map((r) => r.get("name")));
-
-    const signalCheck = await session.run(
-      `MATCH (c:Company)
-       OPTIONAL MATCH (c)-[:HAS_SIGNAL]->(s:Signal)
-       WITH c, count(s) AS signalCount
-       WHERE signalCount = 0
-       RETURN c.name AS name`,
-    );
-    const noSignals = new Set(signalCheck.records.map((r) => r.get("name")));
-    const qualified = scoredCompanies
-      .filter((c) => (c.tier === "HOT" || c.tier === "WARM"))
-      .filter((c) => !hasContact.has(c.companyName))
-      .filter((c) => !noSignals.has(c.companyName))
-      .sort((a, b) => b.totalScore - a.totalScore)
-      .slice(0, 5)
-      .map((c) => ({
-        name: c.companyName,
-        totalScore: c.totalScore,
-        tier: c.tier,
-      }));
-
+    const qualified = await qualifyLeads(session, 5);
     if (qualified.length === 0) {
       return res.json({ ok: true, data: { qualified: [], message: "No qualified leads found" } });
     }
 
-    // Step 2: Find contacts for each qualified company
     const finder = getContactFinder();
     const batchResults = [];
 
     for (const company of qualified) {
-      // Fetch actual signals + applications
-      const detailResult = await session.run(
-        `MATCH (c:Company {name: $name})
-         OPTIONAL MATCH (c)-[:HAS_SIGNAL]->(s:Signal)
-         OPTIONAL MATCH (c)-[:DEVELOPS]->(a:Application)
-         RETURN c.domain AS domain, c.segment AS segment,
-                collect(DISTINCT s.description) AS signals,
-                collect(DISTINCT a.name) AS applications`,
-        { name: company.name },
-      );
-
-      const record = detailResult.records[0];
-      const domain = record?.get("domain") ?? `${company.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`;
-      const segment: string | null = record?.get("segment") ?? null;
-      const signals = (record?.get("signals") ?? []).filter(Boolean).slice(0, 10);
-      const applications = record?.get("applications") ?? [];
+      const profile = await buildCompanyProfile(session, company);
 
       const contacts = await finder.findContacts({
-        companyName: company.name,
-        domain,
-        segment: segment ?? undefined,
-        tier: company.tier,
-        signals,
-        applications,
+        companyName: profile.name,
+        domain: profile.domain,
+        segment: profile.segment ?? undefined,
+        tier: profile.tier,
+        signals: profile.signals.slice(0, 10),
+        applications: profile.applications,
       });
 
       let emailDraft: string | null = null;
       if (contacts.contacts.length > 0 && contacts.contacts[0].email) {
         try {
           emailDraft = await generateOutreachEmail({
-            name: company.name,
-            segment: segment || "BioTech Firm",
-            strongestSignal: signals[0] || "Recent market activity",
-            matchedLine: applications.includes("Hemostasis") ? "Hemostasis" : "Plasma Proteins",
-            tier: (company.tier as "HOT" | "WARM") || "WARM",
-            matchedItemsCount: applications.length || 6,
+            name: profile.name,
+            segment: profile.segment || "BioTech Firm",
+            strongestSignal: profile.strongestSignal,
+            matchedLine: profile.matchedProductLine,
+            tier: profile.tier,
+            matchedItemsCount: profile.applications.length || 6,
           });
 
-          // Send the email via demo transport
           if (emailDraft) {
             try {
-              await sendEmail({ to: contacts.contacts[0].email, subject: `Partnership opportunity: ${company.name} × GI-Hack`, body: emailDraft, from: "partnerships@gi-hack.com" });
+              await sendEmail({ to: contacts.contacts[0].email, subject: `Partnership opportunity: ${profile.name} × GI-Hack`, body: emailDraft, from: "partnerships@gi-hack.com" });
+
+              // Create OUTREACH_SENT record for cooldown tracking
+              await session.run(
+                `MATCH (c:Company {name: $name})
+                 CREATE (o:Outreach {
+                   id: randomUUID(),
+                   date: toString(datetime()),
+                   type: 'email',
+                   contactEmail: $email,
+                   preview: $preview
+                 })
+                 CREATE (c)-[:OUTREACH_SENT]->(o)`,
+                { name: profile.name, email: contacts.contacts[0].email, preview: emailDraft.substring(0, 100) },
+              );
             } catch {
-              // Email send failure is non-fatal — log and continue
+              // Email send failure is non-fatal
             }
           }
         } catch {
@@ -154,9 +125,9 @@ router.post("/outreach/run", async (_req: Request, res: Response): Promise<any> 
       }
 
       batchResults.push({
-        company: company.name,
-        tier: company.tier,
-        score: company.totalScore,
+        company: profile.name,
+        tier: profile.tier,
+        score: profile.totalScore,
         contactsFound: contacts.contacts.length,
         contacts: contacts.contacts,
         emailGenerated: emailDraft !== null,
