@@ -208,3 +208,59 @@ export function useGeneratePreferenceLink() {
     },
   });
 }
+
+// ── Bulk hooks for Leads → Pipeline bridge ────────────────────────
+
+export async function bulkAddToPipeline(companies: Array<{
+  companyName: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactRole?: string;
+}>): Promise<{ added: number; errors: string[] }> {
+  const results = await Promise.allSettled(
+    companies.map(async (company) => {
+      const res = await apiPost<{ contactId: string }>("/api/pipeline/start", {
+        companyName: company.companyName,
+        contactName: company.contactName,
+        contactEmail: company.contactEmail,
+        contactRole: company.contactRole,
+      });
+      if (!res.ok) throw new Error(res.error.message);
+      return res.data.contactId;
+    })
+  );
+
+  const added = results.filter(r => r.status === "fulfilled").length;
+  const errors = results
+    .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+    .map(r => r.reason?.message || "Unknown error");
+
+  return { added, errors };
+}
+
+export function useBulkAddToPipeline() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkAddToPipeline,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pipeline"] });
+      queryClient.invalidateQueries({ queryKey: ["scores"] });
+    },
+  });
+}
+
+// ── AI Contact Finder hook ─────────────────────────────────────────
+
+export function useFindContacts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (companyName: string) => {
+      const res = await apiPost<any>("/api/agents/find-contacts", { companyName });
+      if (!res.ok) throw new Error(res.error.message);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["scores"] });
+    },
+  });
+}
