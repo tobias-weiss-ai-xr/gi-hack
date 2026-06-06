@@ -1,133 +1,218 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 520" font-family="'Inter','SF Pro Display','Segoe UI',system-ui,sans-serif">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#1e293b"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1120"/>
+      <stop offset="100%" stop-color="#182235"/>
     </linearGradient>
-    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#3b82f6"/>
       <stop offset="100%" stop-color="#8b5cf6"/>
     </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="2" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
+    <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
   </defs>
 
   <!-- Background -->
-  <rect width="800" height="400" fill="url(#bg)" rx="12"/>
+  <rect width="1000" height="520" fill="url(#bg)" rx="16"/>
+  <rect x="0" y="0" width="1000" height="3" fill="url(#accent)"/>
 
-  <!-- Grid dots -->
-  <pattern id="dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-    <circle cx="10" cy="10" r="0.8" fill="#334155"/>
+  <!-- Signature dots -->
+  <pattern id="dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+    <circle cx="12" cy="12" r="0.6" fill="#1e293b"/>
   </pattern>
-  <rect width="800" height="400" fill="url(#dots)"/>
+  <rect width="1000" height="520" fill="url(#dots)" rx="16"/>
 
-  <!-- Title -->
-  <text x="400" y="42" text-anchor="middle" font-family="system-ui, sans-serif" font-size="22" font-weight="700" fill="#e2e8f0">AI Graph Pipeline CRM</text>
-  <text x="400" y="62" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" fill="#64748b">Agentic Outreach Workflow</text>
+  <!-- ===== HEADER ===== -->
+  <text x="500" y="44" text-anchor="middle" font-size="26" font-weight="700" fill="#f1f5f9" letter-spacing="0.4">AI Graph Pipeline CRM</text>
+  <text x="500" y="66" text-anchor="middle" font-size="12" fill="#64748b" letter-spacing="0.5">Agentic Outreach Workflow — Neo4j · React 19 · TypeScript</text>
 
-  <!-- Pipeline Stages -->
-  <g transform="translate(40, 90)">
-    <!-- Stage 1: Qualify -->
-    <rect x="0" y="0" width="110" height="90" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
-    <text x="55" y="28" text-anchor="middle" font-family="system-ui" font-size="10" fill="#3b82f6" font-weight="600">QUALIFY</text>
-    <text x="55" y="44" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748b">Score companies</text>
-    <text x="55" y="56" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748b">HOT / WARM / COLD</text>
-    <circle cx="55" cy="75" r="8" fill="#3b82f6" opacity="0.2"/>
-    <text x="55" y="79" text-anchor="middle" font-family="system-ui" font-size="8" fill="#3b82f6">1</text>
+  <!-- ===== 3-STAGE FLOW ===== -->
+  <g transform="translate(0, 90)">
 
-    <!-- Arrow -->
-    <line x1="115" y1="45" x2="140" y2="45" stroke="#334155" stroke-width="1.5"/>
-    <polygon points="140,41 148,45 140,49" fill="#334155"/>
+    <!-- Section label -->
+    <text x="50" y="0" font-size="10" fill="#475569" font-weight="600" letter-spacing="1.2">OUTREACH PIPELINE</text>
+    <rect x="50" y="8" width="900" height="1" fill="#1e293b"/>
 
-    <!-- Stage 2: Find -->
-    <rect x="152" y="0" width="110" height="90" rx="8" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
-    <text x="207" y="28" text-anchor="middle" font-family="system-ui" font-size="10" fill="#8b5cf6" font-weight="600">FIND</text>
-    <text x="207" y="44" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748b">LLM → Scrape</text>
-    <text x="207" y="56" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748b">LinkedIn → Pattern</text>
-    <circle cx="207" cy="75" r="8" fill="#8b5cf6" opacity="0.2"/>
-    <text x="207" y="79" text-anchor="middle" font-family="system-ui" font-size="8" fill="#8b5cf6">2</text>
+    <!-- Flow arrows -->
+    <line x1="340" y1="80" x2="398" y2="80" stroke="#334155" stroke-width="2"/>
+    <polygon points="398,76 410,80 398,84" fill="#475569"/>
+    <line x1="665" y1="80" x2="723" y2="80" stroke="#334155" stroke-width="2"/>
+    <polygon points="723,76 735,80 723,84" fill="#475569"/>
 
-    <!-- Arrow -->
-    <line x1="267" y1="45" x2="292" y2="45" stroke="#334155" stroke-width="1.5"/>
-    <polygon points="292,41 300,45 292,49" fill="#334155"/>
+    <!-- ========= STAGE 1: FIND ========= -->
+    <g>
+      <rect x="40" y="20" width="290" height="190" rx="12" fill="url(#card)" stroke="#3b82f6" stroke-width="1.5"/>
+      <!-- Header bar -->
+      <path d="M40,32 Q40,20 52,20 L318,20 Q330,20 330,32 L330,52 L40,52 Z" fill="url(#blue)" opacity="0.12"/>
+      <circle cx="62" cy="36" r="9" fill="url(#blue)"/>
+      <text x="62" y="40" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">1</text>
+      <text x="78" y="41" font-size="15" fill="#60a5fa" font-weight="600">FIND</text>
+      <text x="125" y="41" font-size="11" fill="#475569">Contact Discovery</text>
 
-    <!-- Stage 3: Write -->
-    <rect x="304" y="0" width="110" height="90" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
-    <text x="359" y="28" text-anchor="middle" font-family="system-ui" font-size="10" fill="#10b981" font-weight="600">EMAIL</text>
-    <text x="359" y="44" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748b">AI-generated</text>
-    <text x="359" y="56" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748b">personalized draft</text>
-    <circle cx="359" cy="75" r="8" fill="#10b981" opacity="0.2"/>
-    <text x="359" y="79" text-anchor="middle" font-family="system-ui" font-size="8" fill="#10b981">3</text>
+      <!-- Content cards -->
+      <rect x="56" y="66" width="258" height="22" rx="5" fill="#1e3a5f" opacity="0.5"/>
+      <text x="68" y="81" font-size="10" fill="#93c5fd" font-weight="500">LLM Contact Strategy</text>
+      <text x="290" y="81" text-anchor="end" font-size="9" fill="#475569">primary</text>
 
-    <!-- Arrow -->
-    <line x1="419" y1="45" x2="444" y2="45" stroke="#334155" stroke-width="1.5"/>
-    <polygon points="444,41 452,45 444,49" fill="#334155"/>
+      <rect x="56" y="92" width="258" height="22" rx="5" fill="#1e3a5f" opacity="0.5"/>
+      <text x="68" y="107" font-size="10" fill="#93c5fd" font-weight="500">Web Scrape Strategy</text>
+      <text x="290" y="107" text-anchor="end" font-size="9" fill="#475569">real emails</text>
 
-    <!-- Stage 4: Confirm -->
-    <rect x="456" y="0" width="130" height="90" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
-    <text x="521" y="28" text-anchor="middle" font-family="system-ui" font-size="10" fill="#f59e0b" font-weight="600">CONFIRM</text>
-    <text x="521" y="44" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748b">Customer preference</text>
-    <text x="521" y="56" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748b">landing page</text>
-    <circle cx="521" cy="75" r="8" fill="#f59e0b" opacity="0.2"/>
-    <text x="521" y="79" text-anchor="middle" font-family="system-ui" font-size="8" fill="#f59e0b">4</text>
+      <rect x="56" y="118" width="258" height="22" rx="5" fill="#1e3a5f" opacity="0.5"/>
+      <text x="68" y="133" font-size="10" fill="#93c5fd" font-weight="500">LinkedIn Strategy</text>
+      <text x="290" y="133" text-anchor="end" font-size="9" fill="#475569">Playwright</text>
+
+      <rect x="56" y="144" width="258" height="22" rx="5" fill="#1e3a5f" opacity="0.5"/>
+      <text x="68" y="159" font-size="10" fill="#93c5fd" font-weight="500">Pattern Email Strategy</text>
+      <text x="290" y="159" text-anchor="end" font-size="9" fill="#475569">fallback</text>
+
+      <!-- Strategy chain badge -->
+      <rect x="56" y="176" width="258" height="22" rx="5" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="185" y="191" text-anchor="middle" font-size="9" fill="#64748b">Pluggable chain — stops at first result</text>
+    </g>
+
+    <!-- ========= STAGE 2: QUALIFY ========= -->
+    <g >
+      <rect x="360" y="20" width="290" height="190" rx="12" fill="url(#card)" stroke="#8b5cf6" stroke-width="1.5"/>
+      <path d="M360,32 Q360,20 372,20 L638,20 Q650,20 650,32 L650,52 L360,52 Z" fill="url(#purple)" opacity="0.12"/>
+      <circle cx="382" cy="36" r="9" fill="url(#purple)"/>
+      <text x="382" y="40" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">2</text>
+      <text x="398" y="41" font-size="15" fill="#a78bfa" font-weight="600">QUALIFY</text>
+      <text x="455" y="41" font-size="11" fill="#475569">Score &amp; Tier</text>
+
+      <rect x="376" y="66" width="258" height="44" rx="6" fill="#2e1065" opacity="0.3"/>
+      <text x="390" y="84" font-size="10" fill="#c4b5fd" font-weight="500">Scorer Engine</text>
+      <text x="390" y="100" font-size="9" fill="#64748b">Scans 1,306 companies from Neo4j graph</text>
+
+      <!-- Tier badges -->
+      <rect x="376" y="118" width="80" height="24" rx="6" fill="#065f46" opacity="0.3"/>
+      <text x="416" y="134" text-anchor="middle" font-size="10" fill="#34d399" font-weight="700">HOT</text>
+
+      <rect x="462" y="118" width="80" height="24" rx="6" fill="#78350f" opacity="0.3"/>
+      <text x="502" y="134" text-anchor="middle" font-size="10" fill="#fbbf24" font-weight="700">WARM</text>
+
+      <rect x="548" y="118" width="86" height="24" rx="6" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="591" y="134" text-anchor="middle" font-size="10" fill="#64748b" font-weight="600">COLD</text>
+
+      <text x="505" y="156" text-anchor="middle" font-size="9" fill="#475569">Score 0–100 per company</text>
+
+      <rect x="376" y="172" width="258" height="26" rx="6" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="505" y="189" text-anchor="middle" font-size="9" fill="#64748b">1 HOT + 5 WARM qualified out of 1,306</text>
+    </g>
+
+    <!-- ========= STAGE 3: CONVERT ========= -->
+    <g >
+      <rect x="680" y="20" width="280" height="190" rx="12" fill="url(#card)" stroke="#10b981" stroke-width="1.5"/>
+      <path d="M680,32 Q680,20 692,20 L948,20 Q960,20 960,32 L960,52 L680,52 Z" fill="url(#green)" opacity="0.12"/>
+      <circle cx="702" cy="36" r="9" fill="url(#green)"/>
+      <text x="702" y="40" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">3</text>
+      <text x="718" y="41" font-size="15" fill="#34d399" font-weight="600">CONVERT</text>
+      <text x="785" y="41" font-size="11" fill="#475569">Engage &amp; Track</text>
+
+      <!-- Sub-step: AI Email -->
+      <rect x="696" y="66" width="248" height="32" rx="6" fill="#064e3b" opacity="0.3"/>
+      <circle cx="710" cy="82" r="5" fill="#10b981"/>
+      <text x="722" y="79" font-size="10" fill="#6ee7b7" font-weight="500">AI-Generated Outreach Email</text>
+      <text x="722" y="92" font-size="8.5" fill="#64748b">Local LLM (Ollama/LocalAI) · Personalized draft</text>
+
+      <!-- Sub-step: Consent -->
+      <rect x="696" y="104" width="248" height="32" rx="6" fill="#064e3b" opacity="0.3"/>
+      <circle cx="710" cy="120" r="5" fill="#10b981"/>
+      <text x="722" y="117" font-size="10" fill="#6ee7b7" font-weight="500">Customer Consent Page</text>
+      <text x="722" y="130" font-size="8.5" fill="#64748b">One-time token · GDPR compliant</text>
+
+      <!-- Sub-step: Pipeline CRM -->
+      <rect x="696" y="142" width="248" height="32" rx="6" fill="#064e3b" opacity="0.3"/>
+      <circle cx="710" cy="158" r="5" fill="#10b981"/>
+      <text x="722" y="155" font-size="10" fill="#6ee7b7" font-weight="500">Pipeline CRM Kanban</text>
+      <text x="722" y="168" font-size="8.5" fill="#64748b">6 stages · 57 activities · 10 demo leads</text>
+
+      <!-- Demo note -->
+      <rect x="696" y="182" width="248" height="18" rx="5" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="820" y="194" text-anchor="middle" font-size="8.5" fill="#475569">npm run demo:pipeline</text>
+    </g>
   </g>
 
-  <!-- Neo4j Graph Visualization -->
-  <g transform="translate(40, 220)">
-    <rect x="0" y="0" width="720" height="150" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
-    <text x="360" y="22" text-anchor="middle" font-family="system-ui" font-size="11" fill="#64748b" font-weight="600">NEO4J GRAPH</text>
+  <!-- ===== BOTTOM: TECH STACK + STATS ===== -->
+  <g transform="translate(0, 300)">
 
-    <!-- Nodes -->
-    <circle cx="100" cy="80" r="28" fill="#3b82f6" opacity="0.15" stroke="#3b82f6" stroke-width="1.5"/>
-    <text x="100" y="77" text-anchor="middle" font-family="system-ui" font-size="8" fill="#60a5fa" font-weight="600">Company</text>
-    <text x="100" y="90" text-anchor="middle" font-family="system-ui" font-size="7" fill="#64748b">1,306</text>
+    <!-- Tech stack badges -->
+    <text x="50" y="0" font-size="10" fill="#475569" font-weight="600" letter-spacing="1.2">TECH STACK</text>
+    <rect x="50" y="8" width="900" height="1" fill="#1e293b"/>
 
-    <circle cx="200" cy="50" r="22" fill="#8b5cf6" opacity="0.15" stroke="#8b5cf6" stroke-width="1.5"/>
-    <text x="200" y="47" text-anchor="middle" font-family="system-ui" font-size="7" fill="#a78bfa" font-weight="600">Signal</text>
-    <text x="200" y="58" text-anchor="middle" font-family="system-ui" font-size="6" fill="#64748b">1,753</text>
+    <g transform="translate(40, 20)">
+      <rect x="0" y="0" width="125" height="26" rx="6" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="62" y="17" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="500">React 19 + Vite</text>
 
-    <circle cx="360" cy="80" r="28" fill="#10b981" opacity="0.15" stroke="#10b981" stroke-width="1.5"/>
-    <text x="360" y="77" text-anchor="middle" font-family="system-ui" font-size="8" fill="#34d399" font-weight="600">Contact</text>
-    <text x="360" y="90" text-anchor="middle" font-family="system-ui" font-size="7" fill="#64748b">Many</text>
+      <rect x="135" y="0" width="140" height="26" rx="6" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="205" y="17" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="500">TanStack Router + Query</text>
 
-    <circle cx="520" cy="50" r="22" fill="#f59e0b" opacity="0.15" stroke="#f59e0b" stroke-width="1.5"/>
-    <text x="520" y="47" text-anchor="middle" font-family="system-ui" font-size="7" fill="#fbbf24" font-weight="600">Activity</text>
-    <text x="520" y="58" text-anchor="middle" font-family="system-ui" font-size="6" fill="#64748b">57</text>
+      <rect x="285" y="0" width="115" height="26" rx="6" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="342" y="17" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="500">Tailwind CSS v4</text>
 
-    <circle cx="620" cy="80" r="22" fill="#ef4444" opacity="0.15" stroke="#ef4444" stroke-width="1.5"/>
-    <text x="620" y="77" text-anchor="middle" font-family="system-ui" font-size="7" fill="#f87171" font-weight="600">Product</text>
-    <text x="620" y="88" text-anchor="middle" font-family="system-ui" font-size="6" fill="#64748b">9</text>
+      <rect x="410" y="0" width="100" height="26" rx="6" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="460" y="17" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="500">Express + TSX</text>
 
-    <!-- Edges -->
-    <line x1="126" y1="68" x2="180" y2="56" stroke="#334155" stroke-width="1"/>
-    <line x1="126" y1="90" x2="334" y2="84" stroke="#334155" stroke-width="1"/>
-    <line x1="196" y1="72" x2="156" y2="78" stroke="#334155" stroke-width="1"/>
-    <line x1="386" y1="78" x2="500" y2="60" stroke="#334155" stroke-width="1"/>
-    <line x1="386" y1="90" x2="600" y2="84" stroke="#334155" stroke-width="1"/>
-    <line x1="540" y1="62" x2="606" y2="76" stroke="#334155" stroke-width="1"/>
+      <rect x="520" y="0" width="95" height="26" rx="6" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="567" y="17" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="500">Neo4j + APOC</text>
+
+      <rect x="625" y="0" width="130" height="26" rx="6" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <text x="690" y="17" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="500">Playwright + Docker</text>
+    </g>
+
+    <!-- Graph stats -->
+    <text x="50" y="75" font-size="10" fill="#475569" font-weight="600" letter-spacing="1.2">NEO4J GRAPH STATE</text>
+    <rect x="50" y="83" width="900" height="1" fill="#1e293b"/>
+
+    <g transform="translate(40, 96)">
+      <!-- Bar: Companies -->
+      <rect x="0" y="0" width="920" height="20" rx="4" fill="#1e293b"/>
+      <rect x="0" y="0" width="400" height="20" rx="4" fill="#3b82f6" opacity="0.3"/>
+      <rect x="0" y="0" width="3" height="20" rx="1.5" fill="#3b82f6"/>
+      <text x="12" y="14" font-size="10" fill="#94a3b8" font-weight="500">Companies</text>
+      <text x="380" y="14" text-anchor="end" font-size="10" fill="#60a5fa" font-weight="700">1,306</text>
+
+      <!-- Bar: Signals -->
+      <rect x="0" y="24" width="920" height="20" rx="4" fill="#1e293b"/>
+      <rect x="0" y="24" width="320" height="20" rx="4" fill="#8b5cf6" opacity="0.3"/>
+      <rect x="0" y="24" width="3" height="20" rx="1.5" fill="#8b5cf6"/>
+      <text x="12" y="38" font-size="10" fill="#94a3b8" font-weight="500">Signals</text>
+      <text x="300" y="38" text-anchor="end" font-size="10" fill="#a78bfa" font-weight="700">1,753</text>
+
+      <!-- Bar: Products -->
+      <rect x="0" y="48" width="920" height="20" rx="4" fill="#1e293b"/>
+      <rect x="0" y="48" width="180" height="20" rx="4" fill="#10b981" opacity="0.3"/>
+      <rect x="0" y="48" width="3" height="20" rx="1.5" fill="#10b981"/>
+      <text x="12" y="62" font-size="10" fill="#94a3b8" font-weight="500">Products</text>
+      <text x="160" y="62" text-anchor="end" font-size="10" fill="#34d399" font-weight="700">9</text>
+
+      <!-- Bar: Activities -->
+      <rect x="0" y="72" width="920" height="20" rx="4" fill="#1e293b"/>
+      <rect x="0" y="72" width="140" height="20" rx="4" fill="#f59e0b" opacity="0.3"/>
+      <rect x="0" y="72" width="3" height="20" rx="1.5" fill="#f59e0b"/>
+      <text x="12" y="86" font-size="10" fill="#94a3b8" font-weight="500">Activities</text>
+      <text x="120" y="86" text-anchor="end" font-size="10" fill="#fbbf24" font-weight="700">57</text>
+
+      <!-- Bar: Relationships -->
+      <rect x="0" y="96" width="920" height="20" rx="4" fill="#1e293b"/>
+      <rect x="0" y="96" width="260" height="20" rx="4" fill="#ef4444" opacity="0.3"/>
+      <rect x="0" y="96" width="3" height="20" rx="1.5" fill="#ef4444"/>
+      <text x="12" y="110" font-size="10" fill="#94a3b8" font-weight="500">Relationships</text>
+      <text x="240" y="110" text-anchor="end" font-size="10" fill="#f87171" font-weight="700">3,515</text>
+    </g>
   </g>
-
-  <!-- Pipeline Kanban bar -->
-  <g transform="translate(40, 140)">
-    <text x="360" y="12" text-anchor="middle" font-family="system-ui" font-size="11" fill="#64748b" font-weight="600">PIPELINE CRM</text>
-    <rect x="0" y="20" width="110" height="24" rx="4" fill="#1e3a5f"/>
-    <text x="55" y="36" text-anchor="middle" font-family="system-ui" font-size="9" fill="#60a5fa">New</text>
-    <rect x="118" y="20" width="110" height="24" rx="4" fill="#1e3a5f"/>
-    <text x="173" y="36" text-anchor="middle" font-family="system-ui" font-size="9" fill="#60a5fa">Contacted</text>
-    <rect x="236" y="20" width="110" height="24" rx="4" fill="#1e3a5f"/>
-    <text x="291" y="36" text-anchor="middle" font-family="system-ui" font-size="9" fill="#60a5fa">Meeting</text>
-    <rect x="354" y="20" width="110" height="24" rx="4" fill="#4a2e1a"/>
-    <text x="409" y="36" text-anchor="middle" font-family="system-ui" font-size="9" fill="#fbbf24">Proposal</text>
-    <rect x="472" y="20" width="110" height="24" rx="4" fill="#1a3d2a"/>
-    <text x="527" y="36" text-anchor="middle" font-family="system-ui" font-size="9" fill="#34d399">Closed Won</text>
-    <rect x="590" y="20" width="110" height="24" rx="4" fill="#3d1a1a"/>
-    <text x="645" y="36" text-anchor="middle" font-family="system-ui" font-size="9" fill="#f87171">Closed Lost</text>
-    <!-- Arrow between stages -->
-    <line x1="52" y1="16" x2="52" y2="14" stroke="none"/>
-  </g>
-
-  <!-- Footer -->
-  <text x="400" y="385" text-anchor="middle" font-family="system-ui" font-size="9" fill="#334155">GI-Hack · Neo4j · React · TypeScript · AI Agentic Outreach</text>
 </svg>
