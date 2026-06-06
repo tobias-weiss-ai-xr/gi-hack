@@ -2,6 +2,8 @@
 
 A ready-to-hack boilerplate for the **StartMiUp Hackathon – AI for Mittelhessen**.
 
+![Pipeline CRM Teaser](docs/teaser.png)
+
 ## 🏗️ Pipeline MVP — Demo
 
 This branch (`feature/pipeline-mvp`) builds on the boilerplate with a demo-ready Pipeline CRM and an agentic outreach workflow:
