@@ -60,7 +60,7 @@ function StageColumn({
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="Company name"
-                  className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-cyan-500"
                   onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                 />
                 <div className="flex gap-1">
@@ -105,7 +105,7 @@ function LeadCard({
     <div className="bg-gray-800 rounded p-3 border border-gray-700 hover:border-gray-600 transition-colors">
       <div className="flex justify-between items-start">
         <div className="min-w-0">
-          <h4 className="text-sm font-medium truncate">{lead.companyName}</h4>
+          <h4 className="text-sm font-medium text-gray-200 truncate">{lead.companyName}</h4>
           {lead.companySegment && (
             <span className="text-[10px] text-gray-400 uppercase tracking-wider">{lead.companySegment}</span>
           )}
@@ -194,7 +194,7 @@ function ContactDetail({ contactId }: { contactId: string }) {
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
             rows={2}
-            className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-cyan-500 resize-none"
+            className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-cyan-500 resize-none"
             placeholder="Write a note..."
           />
           <button
@@ -220,7 +220,7 @@ function ContactDetail({ contactId }: { contactId: string }) {
             <button
               key={s}
               onClick={() => regress.mutate({ contactId, stage: s })}
-              className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-0.5 rounded"
+              className="text-[10px] text-gray-300 bg-gray-700 hover:bg-gray-600 px-2 py-0.5 rounded"
             >
               {s}
             </button>
@@ -271,7 +271,7 @@ export function PipelinePage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Pipeline CRM</h1>
+        <h1 className="text-2xl font-bold text-gray-100">Pipeline CRM</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => runOutreach.mutate()}
