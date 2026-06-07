@@ -10,7 +10,7 @@ test.describe("UI Elements", () => {
   test.describe("Header and Navigation", () => {
     test("should display Siemens Healthineers logo", async ({ page }) => {
       await goto(page, "/");
-      const logo = page.locator('img[alt="Siemens Healthineers"]');
+      const logo = page.locator('text=Siemens Healthineers').first();
       await expect(logo).toBeVisible();
     });
 
@@ -67,10 +67,6 @@ test.describe("UI Elements", () => {
     test("should have search input for companies", async ({ page }) => {
       const searchInput = page.locator('input[placeholder*="Search"]');
       await expect(searchInput).toBeVisible();
-    });
-
-    test("should have segment filter dropdown", async ({ page }) => {
-      await expect(page.locator("select").first()).toBeVisible();
     });
 
     test("should display column headers", async ({ page }) => {

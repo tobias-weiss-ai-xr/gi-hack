@@ -45,10 +45,11 @@ export default defineConfig({
       use: { ...devices['Desktop Firefox'] },
     },
 
-    {
+    // WebKit missing system deps on CI runner (libgtk-4, etc.), skip there
+    ...(process.env.CI ? [] : [{
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
-    },
+    }]),
 
     /* Test against mobile viewports. */
     // {
