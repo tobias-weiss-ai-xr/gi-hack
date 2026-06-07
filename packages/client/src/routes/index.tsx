@@ -636,7 +636,7 @@ function Footer() {
             gap: "24px",
           }}>
             <a
-              href="https://github.com/tobias-weiss-ai/gi-hack"
+              href="https://github.com/tobias-weiss-ai-xr/gi-hack"
               target="_blank"
               rel="noopener noreferrer"
               style={{
