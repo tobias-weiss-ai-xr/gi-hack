@@ -3,12 +3,14 @@ import { createOpenAI } from "@ai-sdk/openai";
 
 export interface AIConfig {
   apiKey: string;
+  baseURL?: string;
   model?: string;
 }
 
 export function createAIProvider(config: AIConfig) {
   const openai = createOpenAI({
     apiKey: config.apiKey,
+    baseURL: config.baseURL,
   });
 
   const model = config.model ?? "gpt-4o-mini";
