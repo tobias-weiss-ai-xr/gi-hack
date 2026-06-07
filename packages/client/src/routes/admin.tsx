@@ -11,7 +11,7 @@ import {
   type SourceInfo,
 } from "../lib/graph";
 
-// @ts-ignore - TanStack Router type definition issue
+// @ts-expect-error - TanStack Router type definition issue
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });

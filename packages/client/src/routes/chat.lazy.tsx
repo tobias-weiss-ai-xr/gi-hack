@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useAskAI } from "../lib/ai";
 
 export function ChatPage() {
@@ -6,7 +6,7 @@ export function ChatPage() {
   const [useGraph, setUseGraph] = useState(false);
   const ask = useAskAI();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) return;
     ask.mutate({ prompt, useGraphContext: useGraph });

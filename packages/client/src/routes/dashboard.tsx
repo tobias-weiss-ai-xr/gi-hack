@@ -6,7 +6,7 @@ import {
   type TierLevel,
 } from "../lib/graph";
 
-// @ts-ignore - TanStack Router type definition issue
+// @ts-expect-error - TanStack Router type definition issue
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
 });

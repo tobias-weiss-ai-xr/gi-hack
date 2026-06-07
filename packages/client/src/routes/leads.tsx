@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useScores, type ScoredCompany, type TierLevel } from "../lib/graph";
 import { useBulkAddToPipeline, useFindContacts } from "../lib/pipeline";
 
-// @ts-ignore - TanStack Router type definition issue
+// @ts-expect-error - TanStack Router type definition issue
 export const Route = createFileRoute("/leads")({
   component: LeadsPage,
 });
