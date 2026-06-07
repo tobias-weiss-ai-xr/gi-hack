@@ -2,6 +2,12 @@ import { SourceAdapter, RawLead, LeadCandidate, Signal } from "../types.js";
 
 const TGA_API = "https://data.tga.gov.au/ARTGSearch/ARTGWebService.svc/JSON/ARTGValueSearch";
 
+// Device entries start appearing around offset 10,000 and continue to ~60,000.
+// Beyond 60k responses can be too large to parse, so we skip those.
+const START_OFFSET = 10_000;
+const MAX_PAGES = 20;
+const PAGE_SIZE = 1000;
+
 const DIAGNOSTIC_GMDN_TERMS = [
   /in.?vitro.?diagnostic/i,
   /diagnostic.?test.?kit/i,
@@ -26,9 +32,6 @@ const DIAGNOSTIC_GMDN_TERMS = [
   /pcr.?test/i,
   /point.?of.?care.?test/i,
 ];
-
-const MAX_PAGES = 5;
-const PAGE_SIZE = 1000;
 
 function isDiagnosticRelated(gmdnTerm: string): boolean {
   return DIAGNOSTIC_GMDN_TERMS.some((re) => re.test(gmdnTerm));
@@ -68,8 +71,8 @@ export class TGAAdapter implements SourceAdapter {
 
     for (let page = 0; page < MAX_PAGES; page++) {
       try {
-        const pageStart = page * PAGE_SIZE + 1;
-        const pageEnd = (page + 1) * PAGE_SIZE;
+        const pageStart = START_OFFSET + page * PAGE_SIZE + 1;
+        const pageEnd = START_OFFSET + (page + 1) * PAGE_SIZE;
         const url = `${TGA_API}/?pagestart=${pageStart}&pageend=${pageEnd}`;
 
         const res = await fetch(url, {
@@ -78,8 +81,13 @@ export class TGAAdapter implements SourceAdapter {
         });
         if (!res.ok) break;
 
-        const data = (await res.json()) as { ARTGEntry?: any[] };
-        const entries = Array.isArray(data?.ARTGEntry) ? data.ARTGEntry : [];
+        let data: { Results?: any[] };
+        try {
+          data = (await res.json()) as { Results?: any[] };
+        } catch {
+          break; // skip pages where response is too large to parse
+        }
+        const entries = Array.isArray(data?.Results) ? data.Results : [];
         if (entries.length === 0) break;
 
         for (const entry of entries) {
@@ -158,8 +166,8 @@ export class TGAAdapter implements SourceAdapter {
         signal: AbortSignal.timeout(10_000),
       });
       if (!res.ok) return false;
-      const data = (await res.json()) as { ARTGEntry?: any[] };
-      return Array.isArray(data?.ARTGEntry) && data.ARTGEntry.length > 0;
+      const data = (await res.json()) as { Results?: any[] };
+      return Array.isArray(data?.Results) && data.Results.length > 0;
     } catch {
       return false;
     }
