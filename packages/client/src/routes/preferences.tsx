@@ -1,6 +1,11 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { useParams } from '@tanstack/react-router';
 import { useState, useEffect, type FormEvent } from 'react';
 import { apiPost, apiPut } from '../lib/api';
+
+export const Route = createFileRoute("/preferences/$contactId/$token")({
+  component: PreferenceFormPage,
+});
 
 export function PreferenceFormPage() {
   const params = useParams({ from: "/preferences/$contactId/$token" });
@@ -390,5 +395,3 @@ export function PreferenceFormPage() {
     </div>
   );
 }
-
-

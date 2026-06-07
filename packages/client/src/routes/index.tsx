@@ -592,30 +592,6 @@ function TeamSection() {
           }}>
             MIT License — Free to use, modify, and distribute
           </div>
-          <a
-            href="https://pretix.eu/startmiup/hackathon/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              padding: "12px 32px",
-              borderRadius: "10px",
-              background: `linear-gradient(135deg, ${COLORS.accent}, ${COLORS.accentDark})`,
-              color: "#fff",
-              fontSize: "14px",
-              fontWeight: "600",
-              textDecoration: "none",
-              display: "inline-block",
-              transition: "all 0.3s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            🎟️ Register for Hackathon
-          </a>
         </div>
       </div>
     </section>
@@ -678,43 +654,7 @@ function Footer() {
             >
               GitHub
             </a>
-            <a
-              href="/presentation/pitch.md"
-              download
-              style={{
-                fontSize: "13px",
-                color: COLORS.subtext,
-                textDecoration: "none",
-                transition: "color 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = COLORS.accent;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = COLORS.subtext;
-              }}
-            >
-              Pitch
-            </a>
-            <a
-              href="https://pretix.eu/startmiup/hackathon/"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                fontSize: "13px",
-                color: COLORS.subtext,
-                textDecoration: "none",
-                transition: "color 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = COLORS.accent;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = COLORS.subtext;
-              }}
-            >
-              Hackathon
-            </a>
+
           </div>
         </div>
 

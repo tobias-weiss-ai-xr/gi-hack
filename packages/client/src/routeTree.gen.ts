@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PipelineRouteImport } from './routes/pipeline'
 import { Route as GraphRouteImport } from './routes/graph'
+import { Route as PreferencesRouteImport } from './routes/preferences'
 
 const PipelineRoute = PipelineRouteImport.update({
   id: '/pipeline',
@@ -47,6 +48,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreferencesRoute = PreferencesRouteImport.update({
+  id: '/preferences/$contactId/$token',
+  path: '/preferences/$contactId/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -55,6 +61,7 @@ export interface FileRoutesByFullPath {
   '/graph': typeof GraphRoute
   '/leads': typeof LeadsRoute
   '/pipeline': typeof PipelineRoute
+  '/preferences/$contactId/$token': typeof PreferencesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -63,6 +70,7 @@ export interface FileRoutesByTo {
   '/graph': typeof GraphRoute
   '/leads': typeof LeadsRoute
   '/pipeline': typeof PipelineRoute
+  '/preferences/$contactId/$token': typeof PreferencesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -72,13 +80,14 @@ export interface FileRoutesById {
   '/graph': typeof GraphRoute
   '/leads': typeof LeadsRoute
   '/pipeline': typeof PipelineRoute
+  '/preferences/$contactId/$token': typeof PreferencesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/dashboard' | '/graph' | '/leads' | '/pipeline'
+  fullPaths: '/' | '/admin' | '/dashboard' | '/graph' | '/leads' | '/pipeline' | '/preferences/$contactId/$token'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/dashboard' | '/graph' | '/leads' | '/pipeline'
-  id: '__root__' | '/' | '/admin' | '/dashboard' | '/graph' | '/leads' | '/pipeline'
+  to: '/' | '/admin' | '/dashboard' | '/graph' | '/leads' | '/pipeline' | '/preferences/$contactId/$token'
+  id: '__root__' | '/' | '/admin' | '/dashboard' | '/graph' | '/leads' | '/pipeline' | '/preferences/$contactId/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -88,6 +97,7 @@ export interface RootRouteChildren {
   GraphRoute: typeof GraphRoute
   LeadsRoute: typeof LeadsRoute
   PipelineRoute: typeof PipelineRoute
+  PreferencesRoute: typeof PreferencesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -127,6 +137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preferences/$contactId/$token': {
+      id: '/preferences/$contactId/$token'
+      path: '/preferences/$contactId/$token'
+      fullPath: '/preferences/$contactId/$token'
+      preLoaderRoute: typeof PreferencesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -144,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   GraphRoute: GraphRoute,
   LeadsRoute: LeadsRoute,
   PipelineRoute: PipelineRoute,
+  PreferencesRoute: PreferencesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
