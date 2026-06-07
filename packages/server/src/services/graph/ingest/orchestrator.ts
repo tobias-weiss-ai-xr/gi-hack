@@ -2,18 +2,27 @@ import { runQuery } from "../neo4j.js";
 import { SourceAdapter, SourceConfig, LeadCandidate, IngestionSummary } from "./types.js";
 
 const LEGAL_SUFFIXES = [
-  " gmbh", " ag", " co. kg", " gmbh & co. kg", " gmbh & co", " gmbh und co",
-  " kg", " ltd", " ltd.", " limited", " inc", " inc.", " corporation", " corp",
-  " llc", " llp", " plc", " pty ltd", " s.a.", " s.a.s", " s.r.l.",
-  " group", " holdings", " holding", " gmbh & co. kg",
-  "the binding site",
+  // Ordered longest-first so greedy matching prefers multi-word suffixes
+  " gmbh & co. kg", " corporation", " gmbh und co",
+  " gmbh & co", " holdings", " limited", " holding", " pty ltd",
+  " co. kg", " s.r.l.",
+  " group",
+  " gmbh", " ltd.", " inc.", " corp", " s.a.", " s.a.s",
+  " ltd", " inc", " llc", " llp", " plc",
+  " ag", " kg",
 ];
 
 function stripLegalSuffix(name: string): string {
   let cleaned = name.toLowerCase().trim();
-  for (const suffix of LEGAL_SUFFIXES) {
-    if (cleaned.endsWith(suffix)) {
-      cleaned = cleaned.slice(0, -suffix.length).trim();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const suffix of LEGAL_SUFFIXES) {
+      if (cleaned.endsWith(suffix)) {
+        cleaned = cleaned.slice(0, -suffix.length).trim();
+        changed = true;
+        break;
+      }
     }
   }
   return cleaned;
@@ -27,7 +36,7 @@ export function normalizeCompanyName(name: string): string {
   return stripLegalSuffix(stripParenthetical(name))
     .toLowerCase()
     .replace(/,/g, "")
-    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
     .replace(/\s+/g, " ")
     .trim();
 }
