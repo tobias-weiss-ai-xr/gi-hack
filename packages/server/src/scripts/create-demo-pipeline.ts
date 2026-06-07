@@ -171,8 +171,6 @@ const DEMO_LEADS: DemoLead[] = [
   }
 ];
 
-// @ts-expect-error - Function exists for future use with timestamped activities
-
 async function createDemoLead(
   lead: DemoLead
 ): Promise<{ contactId: string; activitiesCount: number }> {

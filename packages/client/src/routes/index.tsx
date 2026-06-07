@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 
-// @ts-expect-error - TanStack Router type definition issue
 export const Route = createFileRoute("/")({
   component: LandingPage,
 });
