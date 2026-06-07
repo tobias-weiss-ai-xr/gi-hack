@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-const API = "http://localhost:3001/api";
+const API = "/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

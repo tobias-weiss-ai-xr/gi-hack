@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-const API_BASE = 'http://localhost:3001/api/ai';
+const API_BASE = '/api/ai';
 
 /**
  * Hook to trigger automated AI Enrichment for missing target company metadata.
