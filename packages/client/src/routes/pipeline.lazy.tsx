@@ -10,9 +10,7 @@ import {
   useRunOutreach,
   useGeneratePreferenceLink,
   STAGES,
-  type StageName,
   type PipelineLead,
-  type ContactSummary,
 } from "../lib/pipeline";
 
 function StageColumn({
@@ -147,7 +145,7 @@ function LeadCard({
                 await navigator.clipboard.writeText(url);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
-              } catch {}
+              } catch { /* ignore */ }
             }}
             disabled={genLink.isPending}
             className="text-xs text-gray-400 hover:text-cyan-400 transition-colors disabled:opacity-40"
@@ -169,7 +167,6 @@ function ContactDetail({ contactId }: { contactId: string }) {
   const [showNote, setShowNote] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [showRegress, setShowRegress] = useState(false);
-  const [targetStage, setTargetStage] = useState("");
 
   const handleAddNote = () => {
     if (noteText.trim()) {

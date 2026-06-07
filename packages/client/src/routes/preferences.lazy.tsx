@@ -1,5 +1,5 @@
 import { useParams } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { apiPost, apiPut } from '../lib/api';
 
 export function PreferenceFormPage() {
@@ -92,7 +92,7 @@ export function PreferenceFormPage() {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!formData.consentGiven) return;
 
@@ -198,7 +198,7 @@ export function PreferenceFormPage() {
                   setSuccess(false);
                   setTokenValid(false);
                   setError('Your consent has been withdrawn.');
-                } catch {}
+                } catch { /* ignore */ }
               }}
               className="text-sm text-rose-500 hover:text-rose-600 underline"
             >
