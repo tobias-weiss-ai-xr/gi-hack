@@ -78,17 +78,37 @@ describe("TGAAdapter", () => {
   it("healthCheck returns true on success", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
+      json: () => Promise.resolve({ Results: [{ ARTGNumber: "123" }] }),
     } as Response);
     const healthy = await adapter.healthCheck();
     expect(healthy).toBe(true);
   });
 
-  it("should skip records with non-ACTIVE status", async () => {
+  it("should skip non-diagnostic records", async () => {
+    // TGA adapter filters: EntryType="Medical Device Included", GMDNTerm matching diagnostic terms
     const mockData = {
-      results: [
-        { artgNumber: "1", companyName: "Active Co", productName: "A", status: "ACTIVE", category: "" },
-        { artgNumber: "2", companyName: "Expired Co", productName: "B", status: "EXPIRED", category: "" },
-        { artgNumber: "3", companyName: "Active Co 2", productName: "C", status: "ACTIVE", category: "" },
+      Results: [
+        {
+          ARTGNumber: "1",
+          EntryType: "Medical Device Included",
+          Sponsor: { Name: "Active Co" },
+          ApprovalDate: "2024-01-01",
+          Products: [{ GMDNTerm: "Reagent for diagnostic use" }],
+        },
+        {
+          ARTGNumber: "2",
+          EntryType: "Medical Device Included",
+          Sponsor: { Name: "Other Co" },
+          ApprovalDate: "2024-01-02",
+          Products: [{ GMDNTerm: "Surgical instrument" }],
+        },
+        {
+          ARTGNumber: "3",
+          EntryType: "Medical Device Included",
+          Sponsor: { Name: "Dx Co" },
+          ApprovalDate: "2024-01-03",
+          Products: [{ GMDNTerm: "In vitro diagnostic test kit" }],
+        },
       ],
     };
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
@@ -96,6 +116,7 @@ describe("TGAAdapter", () => {
       json: () => Promise.resolve(mockData),
     } as Response);
     const result = await adapter.fetch();
+    // Only records 1 and 3 have diagnostic-related GMDN terms
     expect(result).toHaveLength(2);
   });
 });

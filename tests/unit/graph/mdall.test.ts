@@ -34,14 +34,12 @@ describe("MDALLAdapter", () => {
       sourceId: "mdall-12345",
       sourceUrl: "https://health-products.canada.ca/mdall-licence/12345",
       raw: {
-        licence_number: "12345",
+        original_licence_no: 12345,
         company_name: "Bio-Rad Laboratories (Canada) Ltd.",
         licence_name: "SARS-CoV-2 Antigen Detection Kit",
-        status: "ACTIVE",
-        issue_date: "2024-01-15",
-        device_identifier: "DEV-001",
+        licence_status: "D",
+        first_licence_status_dt: "2024-01-15",
         device_name: "COVID-19 Rapid Antigen Test",
-        manufacturer_name: "Bio-Rad Laboratories",
         _assignedApplication: "Infectious Disease & Serology",
       },
     };
@@ -59,11 +57,12 @@ describe("MDALLAdapter", () => {
       sourceId: "mdall-99999",
       sourceUrl: "https://health-products.canada.ca/mdall-licence/99999",
       raw: {
-        licence_number: "99999",
+        original_licence_no: 99999,
         company_name: "TestCo",
         licence_name: "Test Device",
-        status: "ACTIVE",
-        issue_date: "",
+        licence_status: "D",
+        first_licence_status_dt: "",
+        company_id: 0,
       },
     };
     const result = adapter.normalize(raw);
@@ -73,13 +72,22 @@ describe("MDALLAdapter", () => {
 
   it("should skip records with empty company_name", async () => {
     const mockResponse = [
-      { licence_number: "1", company_name: "", licence_name: "Test", status: "ACTIVE", issue_date: "2024-01-01" },
-      { licence_number: "2", company_name: "Valid Corp", licence_name: "Test 2", status: "ACTIVE", issue_date: "2024-01-02" },
+      { original_licence_no: 1, company_name: "", licence_name: "Test", licence_status: "D", first_licence_status_dt: "2024-01-01", company_id: 100 },
+      { original_licence_no: 2, company_name: "Valid Corp", licence_name: "Test 2", licence_status: "D", first_licence_status_dt: "2024-01-02", company_id: 101 },
     ];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockResponse),
-    } as Response);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([]),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([{ company_name: "Valid Corp" }]),
+      } as Response);
     const result = await adapter.fetch();
     expect(result).toHaveLength(1);
     expect(result[0].sourceId).toBe("mdall-2");
