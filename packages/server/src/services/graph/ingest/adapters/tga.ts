@@ -1,25 +1,42 @@
 import { SourceAdapter, RawLead, LeadCandidate, Signal } from "../types.js";
 
-const ARTG_API = "https://www.tga.gov.au/api/v2/artg";
+const TGA_API = "https://data.tga.gov.au/ARTGSearch/ARTGWebService.svc/JSON/ARTGValueSearch";
 
-const DEVICE_KEYWORDS = [
-  "diagnostic", "assay", "reagent", "test kit", "immunoassay",
-  "analyzer", "lateral flow", "rapid test", "elisa",
+const DIAGNOSTIC_GMDN_TERMS = [
+  /in.?vitro.?diagnostic/i,
+  /diagnostic.?test.?kit/i,
+  /reagent/i,
+  /assay/i,
+  /immunoassay/i,
+  /analyzer/i,
+  /laboratory.?diagnostic/i,
+  /pathology/i,
+  /serolog/i,
+  /infectious.?disease.?test/i,
+  /rapid.?test/i,
+  /lateral.?flow/i,
+  /elisa/i,
+  /clinical.?chemistry/i,
+  /blood.?gas.?analyzer/i,
+  /glucose.?monitoring/i,
+  /coagulation.?reagent/i,
+  /hematology.?analyzer/i,
+  /microbiology.?test/i,
+  /molecular.?diagnostic/i,
+  /pcr.?test/i,
+  /point.?of.?care.?test/i,
 ];
 
-interface TGAEntry {
-  artgNumber: string;
-  productName: string;
-  companyName: string;
-  category: string;
-  gmdnTerm?: string;
-  approvalDate?: string;
-  status: string;
+const MAX_PAGES = 5;
+const PAGE_SIZE = 1000;
+
+function isDiagnosticRelated(gmdnTerm: string): boolean {
+  return DIAGNOSTIC_GMDN_TERMS.some((re) => re.test(gmdnTerm));
 }
 
-function classifyApplication(productName: string, gmdnTerm?: string): string {
-  const text = `${productName} ${gmdnTerm ?? ""}`.toLowerCase();
-  if (/immunoassay|elisa|serolog|infectious|antibody|antigen|pathogen/.test(text))
+function classifyApplication(productGmdnTerms: string[]): string {
+  const text = productGmdnTerms.join(" ").toLowerCase();
+  if (/infectious|pathogen|virus|bacterial|serolog|antibody|antigen/.test(text))
     return "Infectious Disease & Serology";
   if (/tumor|cancer|oncology|biomarker/.test(text))
     return "Oncology & Tumor Markers";
@@ -31,6 +48,12 @@ function classifyApplication(productName: string, gmdnTerm?: string): string {
     return "Autoimmune Diagnostics";
   if (/point.of.care|rapid|lateral.flow|poc/.test(text))
     return "Point of Care";
+  if (/reagent|assay|immunoassay|elisa|chemistry/.test(text))
+    return "Specialty Proteins & Reagents";
+  if (/hematology|microbiology|molecular|pcr/.test(text))
+    return "Infectious Disease & Serology";
+  if (/glucose|blood.gas/.test(text))
+    return "Cardiac Markers";
   return "Infectious Disease & Serology";
 }
 
@@ -43,39 +66,53 @@ export class TGAAdapter implements SourceAdapter {
     const allLeads: RawLead[] = [];
     const seenArtgs = new Set<string>();
 
-    for (const keyword of DEVICE_KEYWORDS) {
+    for (let page = 0; page < MAX_PAGES; page++) {
       try {
-        const url = `${ARTG_API}/search?query=${encodeURIComponent(keyword)}&limit=100`;
+        const pageStart = page * PAGE_SIZE + 1;
+        const pageEnd = (page + 1) * PAGE_SIZE;
+        const url = `${TGA_API}/?pagestart=${pageStart}&pageend=${pageEnd}`;
+
         const res = await fetch(url, {
           headers: { "User-Agent": "LeadGraph/1.0", Accept: "application/json" },
           signal: AbortSignal.timeout(15_000),
         });
-        if (!res.ok) continue;
+        if (!res.ok) break;
 
-        const data = (await res.json()) as { results: TGAEntry[] };
-        if (!data.results?.length) continue;
+        const data = (await res.json()) as { ARTGEntry?: any[] };
+        const entries = Array.isArray(data?.ARTGEntry) ? data.ARTGEntry : [];
+        if (entries.length === 0) break;
 
-        for (const entry of data.results) {
-          if (seenArtgs.has(entry.artgNumber)) continue;
-          seenArtgs.add(entry.artgNumber);
-          if (!entry.companyName || entry.status !== "ACTIVE") continue;
+        for (const entry of entries) {
+          if (entry.EntryType !== "Medical Device Included") continue;
+          if (!entry.ARTGNumber || seenArtgs.has(entry.ARTGNumber)) continue;
+
+          const companyName = entry.Sponsor?.Name?.trim();
+          if (!companyName) continue;
+
+          const products = Array.isArray(entry.Products) ? entry.Products : [];
+          const gmdnTerms: string[] = products
+            .map((p: any) => p.GMDNTerm ?? "")
+            .filter(Boolean);
+
+          if (!gmdnTerms.some(isDiagnosticRelated)) continue;
+
+          seenArtgs.add(entry.ARTGNumber);
+          const approvalDate: string = entry.ApprovalDate ?? "";
+          const appArea = classifyApplication(gmdnTerms);
 
           allLeads.push({
-            sourceId: `tga-${entry.artgNumber}`,
-            sourceUrl: `https://www.tga.gov.au/artg/${entry.artgNumber}`,
+            sourceId: `tga-${entry.ARTGNumber}`,
+            sourceUrl: `https://www.tga.gov.au/resources/artg/${entry.ARTGNumber}`,
             raw: {
-              companyName: entry.companyName,
-              productName: entry.productName,
-              artgNumber: entry.artgNumber,
-              category: entry.category ?? "",
-              gmdnTerm: entry.gmdnTerm ?? "",
-              approvalDate: entry.approvalDate ?? "",
-              applicationArea: classifyApplication(entry.productName, entry.gmdnTerm),
+              companyName,
+              gmdnTerms,
+              artgNumber: entry.ARTGNumber,
+              approvalDate,
+              applicationArea: appArea,
             } as unknown as Record<string, unknown>,
           });
         }
       } catch {
-        continue;
       }
     }
 
@@ -85,17 +122,22 @@ export class TGAAdapter implements SourceAdapter {
   normalize(raw: RawLead): LeadCandidate {
     const r = raw.raw as Record<string, unknown>;
     const companyName = r.companyName as string;
-    const productName = r.productName as string;
+    const gmdnTerms = (r.gmdnTerms as string[]) ?? [];
     const approvalDate = r.approvalDate as string;
     const appArea = r.applicationArea as string;
     const artgNumber = r.artgNumber as string;
+
+    const gmdnDesc = gmdnTerms.length > 0 ? gmdnTerms.join(", ") : "";
+    const desc = gmdnDesc
+      ? `TGA ARTG ${artgNumber}: ${gmdnDesc}`
+      : `TGA ARTG ${artgNumber}`;
 
     const signals: Signal[] = [
       {
         type: "TGA_CLEARANCE",
         date: approvalDate || new Date().toISOString().slice(0, 10),
         confidence: 0.85,
-        description: `TGA ARTG ${artgNumber}: ${productName}`,
+        description: desc,
         url: raw.sourceUrl,
       },
     ];
@@ -111,11 +153,13 @@ export class TGAAdapter implements SourceAdapter {
 
   async healthCheck(): Promise<boolean> {
     try {
-      const res = await fetch(`${ARTG_API}/search?query=diagnostic&limit=1`, {
+      const res = await fetch(`${TGA_API}/?pagestart=1&pageend=5`, {
         headers: { "User-Agent": "LeadGraph/1.0", Accept: "application/json" },
         signal: AbortSignal.timeout(10_000),
       });
-      return res.ok;
+      if (!res.ok) return false;
+      const data = (await res.json()) as { ARTGEntry?: any[] };
+      return Array.isArray(data?.ARTGEntry) && data.ARTGEntry.length > 0;
     } catch {
       return false;
     }

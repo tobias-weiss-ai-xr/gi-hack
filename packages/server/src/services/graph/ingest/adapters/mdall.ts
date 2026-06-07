@@ -1,6 +1,6 @@
 import { SourceAdapter, RawLead, LeadCandidate, Signal } from "../types.js";
 
-const MDALL_API = "https://health-products.canada.ca/api/medical-devices/licences";
+const MDALL_API = "https://health-products.canada.ca/api/medical-devices";
 
 const CATEGORY_FILTERS = [
   { keyword: "diagnostic", application: "Infectious Disease & Serology" },
@@ -15,14 +15,13 @@ const CATEGORY_FILTERS = [
 ];
 
 interface MDALLRecord {
-  licence_number: string;
-  company_name: string;
+  original_licence_no: number;
+  licence_status: string;
   licence_name: string;
-  status: string;
-  issue_date: string;
-  device_identifier?: string;
+  first_licence_status_dt: string;
+  company_id: number;
   device_name?: string;
-  manufacturer_name?: string;
+  end_date?: string;
 }
 
 function classifyApplication(deviceName: string, licenceName: string): string {
@@ -42,6 +41,28 @@ function classifyApplication(deviceName: string, licenceName: string): string {
   return "Infectious Disease & Serology";
 }
 
+const companyNameCache = new Map<number, string | null>();
+
+async function resolveCompanyName(companyId: number): Promise<string | null> {
+  if (companyNameCache.has(companyId)) return companyNameCache.get(companyId) ?? null;
+
+  try {
+    const url = `${MDALL_API}/company?company_id=${companyId}`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "LeadGraph/1.0", Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Array<{ company_name: string }>;
+    const company = Array.isArray(data) && data.length > 0 ? data[0] : null;
+    const name = company?.company_name ?? null;
+    if (name) companyNameCache.set(companyId, name);
+    return name;
+  } catch {
+    return null;
+  }
+}
+
 export class MDALLAdapter implements SourceAdapter {
   readonly id = "mdall";
   readonly name = "Canada MDALL";
@@ -49,11 +70,12 @@ export class MDALLAdapter implements SourceAdapter {
 
   async fetch(): Promise<RawLead[]> {
     const allLeads: RawLead[] = [];
-    const seenLicences = new Set<string>();
+    const seenLicences = new Set<number>();
 
     for (const filter of CATEGORY_FILTERS) {
       try {
-        const url = `${MDALL_API}?keyword=${filter.keyword}&status=ACTIVE&limit=100`;
+        // Status D = Distributed (Active) in Health Canada's MDALL system
+        const url = `${MDALL_API}/licence?keyword=${filter.keyword}&status=D&limit=100`;
         const res = await fetch(url, {
           headers: { "User-Agent": "LeadGraph/1.0", Accept: "application/json" },
           signal: AbortSignal.timeout(15_000),
@@ -63,15 +85,19 @@ export class MDALLAdapter implements SourceAdapter {
         const data = (await res.json()) as MDALLRecord[];
         const records = Array.isArray(data) ? data : [];
         for (const record of records) {
-          if (seenLicences.has(record.licence_number)) continue;
-          seenLicences.add(record.licence_number);
-          if (!record.company_name) continue;
+            if (seenLicences.has(record.original_licence_no)) continue;
+          seenLicences.add(record.original_licence_no);
+          if (record.licence_status !== "D") continue;
+
+          const companyName = await resolveCompanyName(record.company_id);
+          if (!companyName) continue;
 
           allLeads.push({
-            sourceId: `mdall-${record.licence_number}`,
-            sourceUrl: `https://health-products.canada.ca/mdall-licence/${record.licence_number}`,
+            sourceId: `mdall-${record.original_licence_no}`,
+            sourceUrl: `https://health-products.canada.ca/mdall-licence/${record.original_licence_no}`,
             raw: {
               ...record,
+              company_name: companyName,
               _assignedApplication: filter.application,
             } as unknown as Record<string, unknown>,
           });
@@ -88,8 +114,8 @@ export class MDALLAdapter implements SourceAdapter {
     const r = raw.raw as Record<string, unknown>;
     const companyName = r.company_name as string;
     const licenceName = r.licence_name as string;
-    const issueDate = r.issue_date as string;
-    const deviceName = r.device_name as string ?? "";
+    const issueDate = r.first_licence_status_dt as string;
+    const deviceName = (r.device_name as string) ?? "";
 
     const appArea = deviceName
       ? classifyApplication(deviceName, licenceName)
@@ -116,7 +142,7 @@ export class MDALLAdapter implements SourceAdapter {
 
   async healthCheck(): Promise<boolean> {
     try {
-      const res = await fetch(`${MDALL_API}?keyword=diagnostic&limit=1`, {
+      const res = await fetch(`${MDALL_API}/licence?keyword=diagnostic&limit=1`, {
         headers: { "User-Agent": "LeadGraph/1.0", Accept: "application/json" },
         signal: AbortSignal.timeout(10_000),
       });
