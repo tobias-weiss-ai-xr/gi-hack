@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import express from 'express';
-import apiRouter from '../../../packages/server/dist/routes/api.js';
+import apiRouter from '../../packages/server/dist/routes/api.js';
 
 const app = express();
 app.use(express.json());
