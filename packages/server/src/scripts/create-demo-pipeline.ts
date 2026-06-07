@@ -5,7 +5,6 @@ import { runQuery } from '../services/graph/neo4j.js';
 import { startPipeline, addActivity, ensurePipelineStages } from '../services/graph/pipeline/index.js';
 
 const STAGES = ['New', 'Contacted', 'Meeting', 'Proposal', 'Closed Won', 'Closed Lost'] as const;
-const ACTIVITY_TYPES = ['NOTE', 'EMAIL', 'CALL', 'MEETING', 'STAGE_CHANGE'] as const;
 
 interface DemoLead {
   companyName: string;
@@ -17,7 +16,7 @@ interface DemoLead {
 }
 
 interface ActivityTemplate {
-  type: typeof ACTIVITY_TYPES[number];
+  type: 'NOTE' | 'EMAIL' | 'CALL' | 'MEETING' | 'STAGE_CHANGE';
   note: string;
   daysOffset: number;
 }
@@ -173,11 +172,6 @@ const DEMO_LEADS: DemoLead[] = [
 ];
 
 // @ts-expect-error - Function exists for future use with timestamped activities
-function daysToISOString(daysOffset: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + daysOffset);
-  return date.toISOString();
-}
 
 async function createDemoLead(
   lead: DemoLead

@@ -121,6 +121,7 @@ export class TGAAdapter implements SourceAdapter {
           });
         }
       } catch {
+        // API error — skip page
       }
     }
 
