@@ -14,6 +14,7 @@ export interface PipelineLead {
   id: string;
   stage: PipelineStage;
   currentStage: PipelineStage;
+  companyId: string;
   companyName: string;
   companyDomain?: string;
   companySegment?: string;

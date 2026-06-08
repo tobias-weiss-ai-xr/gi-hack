@@ -4,6 +4,7 @@ const STAGES = ["New", "Contacted", "Meeting", "Proposal", "Closed Won", "Closed
 export type PipelineStage = (typeof STAGES)[number];
 
 export interface PipelineLead {
+  companyId: string;
   companyName: string;
   companyDomain?: string;
   companySegment?: string;
@@ -138,7 +139,8 @@ export async function getPipelineLeads(): Promise<PipelineLead[]> {
      WITH contact, company, stageRel, stage, a
      ORDER BY a.date DESC
      WITH contact, company, stageRel, stage, collect(a)[0] AS latestActivity
-     RETURN company.name AS companyName,
+     RETURN id(company) AS companyId,
+            company.name AS companyName,
             company.domain AS companyDomain,
             company.segment AS companySegment,
             company.description AS companyDescription,
@@ -163,6 +165,7 @@ export async function getPipelineLeads(): Promise<PipelineLead[]> {
 
     if (!companyMap.has(name)) {
       companyMap.set(name, {
+        companyId: String(r.companyId ?? ""),
         companyName: name,
         companyDomain: r.companyDomain ?? undefined,
         companySegment: r.companySegment ?? undefined,

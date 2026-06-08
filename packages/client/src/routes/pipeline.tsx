@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   usePipelineLeads,
@@ -104,7 +104,9 @@ function LeadCard({
     <div className="bg-gray-800 rounded p-3 border border-gray-700 hover:border-gray-600 transition-colors">
       <div className="flex justify-between items-start">
         <div className="min-w-0">
-          <h4 className="text-sm font-medium text-gray-200 truncate">{lead.companyName}</h4>
+          <Link to="/leads" search={{ company: lead.companyName }} className="hover:text-indigo-400 transition-colors">
+            <h4 className="text-sm font-medium text-gray-200 truncate">{lead.companyName}</h4>
+          </Link>
           {lead.companySegment && (
             <span className="text-[10px] text-gray-400 uppercase tracking-wider">{lead.companySegment}</span>
           )}

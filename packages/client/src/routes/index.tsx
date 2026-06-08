@@ -158,6 +158,36 @@ function HeroSection() {
           Explore the Dashboard
         </Link>
 
+        <a
+          href="/LeadGraph.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            padding: "16px 40px",
+            borderRadius: "12px",
+            background: "transparent",
+            color: COLORS.text,
+            fontSize: "16px",
+            fontWeight: "600",
+            textDecoration: "none",
+            border: `1px solid rgba(255,255,255,0.2)`,
+            cursor: "pointer",
+            transition: "all 0.3s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = COLORS.accent;
+            e.currentTarget.style.color = COLORS.accent;
+            e.currentTarget.style.transform = "translateY(-2px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+            e.currentTarget.style.color = COLORS.text;
+            e.currentTarget.style.transform = "translateY(0)";
+          }}
+        >
+          View Presentation (PDF)
+        </a>
+
       </div>
 
       <FlowDiagram />
@@ -653,6 +683,25 @@ function Footer() {
               }}
             >
               GitHub
+            </a>
+            <a
+              href="/LeadGraph.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: "13px",
+                color: COLORS.subtext,
+                textDecoration: "none",
+                transition: "color 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = COLORS.accent;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = COLORS.subtext;
+              }}
+            >
+              Presentation (PDF)
             </a>
 
           </div>

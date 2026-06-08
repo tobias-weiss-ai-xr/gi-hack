@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useScores, type ScoredCompany, type TierLevel } from "../lib/graph";
 import { useBulkAddToPipeline, useFindContacts } from "../lib/pipeline";
@@ -258,6 +258,15 @@ export function LeadsPage() {
   const [hoveredCompany, setHoveredCompany] = useState<string | null>(null);
   const bulkAddToPipeline = useBulkAddToPipeline();
   const findContacts = useFindContacts();
+  const urlSearch = useSearch({ from: "/leads" }) as { company?: string };
+
+  // Auto-select company from URL param (pipeline link navigation)
+  useEffect(() => {
+    if (urlSearch.company && companies.length > 0) {
+      const match = companies.find((c) => c.name === urlSearch.company);
+      if (match) setSelected(match);
+    }
+  }, [urlSearch.company, companies]);
 
   const filtered = useMemo(() => {
     return companies
